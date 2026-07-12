@@ -1,26 +1,50 @@
 @import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@plugin "@tailwindcss/typography";
 
 @theme inline {
+  --color-scratch-blue: #4c97ff;
+  --color-scratch-purple: #cf63cf;
+  --color-scratch-orange: #ff8c1a;
+  --color-scratch-yellow: #ffab19;
+  --color-scratch-green: #0fbd8c;
+  --color-scratch-pink: #ff6680;
+  --color-scratch-teal: #40bfcf;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: 'Lexend', sans-serif;
   --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  --background: #f8f7ff;
+  --foreground: #1a1a2e;
+  --gradient-hero: linear-gradient(135deg, #4c97ff 0%, #cf63cf 50%, #ff8c1a 100%);
+  --gradient-card: linear-gradient(135deg, #f0f0ff 0%, #fff0f5 100%);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0f0f1a;
+    --foreground: #e8e8f0;
+    --gradient-card: linear-gradient(135deg, #1a1a30 0%, #1f1525 100%);
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Lexend', Arial, Helvetica, sans-serif;
+}
+
+::selection {
+  background: #4c97ff40;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
 }

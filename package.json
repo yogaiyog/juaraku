@@ -9,12 +9,19 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "js-yaml": "^5.2.1",
     "next": "16.2.10",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "remark-html": "^16.0.1",
+    "remark-parse": "^11.0.0",
+    "scratchblocks": "^3.7.0",
+    "unified": "^11.0.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@tailwindcss/typography": "^0.5.20",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

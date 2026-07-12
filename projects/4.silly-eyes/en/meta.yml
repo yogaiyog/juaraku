@@ -1,0 +1,30 @@
+---
+title: Silly eyes
+hero_image: images/banner.png
+description: Create your own app with a character whose eyes follow the mouse pointer
+meta_title: Scratch coding projects for kids and teens | Silly eyes
+meta_description: Learn to code in Scratch with the Raspberry Pi Foundation's coding projects for kids and teens. Make a Scratch animation and create a character with silly eyes.
+pdf: resources/silly-eyes.pdf
+version: 4
+listed: true
+copyedit: false
+last_tested: '2021-02-25'
+steps:
+- title: You will make
+- title: Create your character
+- title: Make silly eyes
+  completion:
+  - engaged
+- title: Add sprite effects
+  completion:
+  - internal
+- title: Quick quiz
+  knowledge_quiz:
+    path: quiz1
+    version: 1
+    questions: 3
+    passing_score: 3
+  completion:
+  - external
+- title: Upgrade your project
+- title: Share and play

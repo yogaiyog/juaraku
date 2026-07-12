@@ -1,0 +1,32 @@
+---
+title: Catch the bus
+hero_image: images/banner.png
+description: Code sprites to walk or fly to the bus before it drives off
+meta_title: Scratch coding projects for kids and teens | Catch the bus
+meta_description: Learn to code in Scratch with the Raspberry Pi Foundation's coding projects for kids and teens. Make a Scratch animation with sprites that run to catch a bus.
+pdf: resources/catch-the-bus.pdf
+version: 4
+listed: true
+copyedit: false
+last_tested: 2021-02-17
+steps:
+  - title: What you will make
+  - title: Create your bus scene
+  - title: The Scratch Cat catches the bus
+    completion:
+      - engaged
+  - title: The hippo flies to the bus
+  - title: The bus leaves
+  - title: Missing the bus
+  - title: Change the destination
+    completion:
+      - internal
+  - title: Quick quiz
+    knowledge_quiz:
+      path: quiz1
+      version: 1
+      questions: 3
+      passing_score: 3
+    completion:
+      - external
+  - title: Upgrade your project

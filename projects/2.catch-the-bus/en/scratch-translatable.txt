@@ -1,0 +1,29 @@
+try numbers up to 200
+
+bottom right-hand side
+
+try different numbers
+
+5 is a good walking speed
+
+top left-hand side
+
+change from mouse-pointer
+
+change 1 to 4
+
+right-hand side of the Stage
+
+try 0.1, 0.5, 0.05
+
+change from 4 to 6
+
+drag the sprite to choose x and y
+
+bottom middle of the Stage
+
+point down
+
+short delay
+
+up to 200
