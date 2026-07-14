@@ -44,8 +44,11 @@ export default function ProjectCard({ project, index, priority }: Props) {
       <p className="mt-1 line-clamp-2 text-sm text-zinc-500">
         {project.meta.description}
       </p>
-      <div className="mt-3 flex items-center gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <Badge variant="default">{project.stepCount} steps</Badge>
+        {project.categories.map((cat) => (
+          <Badge key={cat.id} variant="category">{cat.name}</Badge>
+        ))}
       </div>
     </Link>
   );

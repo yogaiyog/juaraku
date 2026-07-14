@@ -23,11 +23,26 @@ export type ProjectMeta = {
   pdf?: string;
 };
 
+export type Category = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
+export type Path = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+};
+
 export type Project = {
   id: string;
   meta: ProjectMeta;
   stepCount: number;
   directoryName: string;
+  categories: Category[];
+  pathIndex?: number;
 };
 
 export type ContentSegment =

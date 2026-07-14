@@ -21,7 +21,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistMono.variable} h-full antialiased`}
+      className={`${geistMono.variable} h-full antialiased bg-white dark:bg-zinc-950`}
     >
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
