@@ -4,6 +4,8 @@ import { applyTransforms } from "@/lib/transform-images";
 import TaskBlock from "./TaskBlock";
 import Blocks3Renderer from "./Blocks3Renderer";
 import ScratchContent from "./ScratchContent";
+import Collapse from "./Collapse";
+import SavePanel from "./SavePanel";
 
 type Props = {
   segments: ContentSegment[];
@@ -65,6 +67,16 @@ export default function StepRenderer({ segments, projectId }: Props) {
             );
           case "blocks3":
             return <Blocks3Renderer key={i} code={seg.code} />;
+          case "collapse":
+            return (
+              <Collapse
+                key={i}
+                title={seg.title}
+                html={renderHtml(seg.content, projectId)}
+              />
+            );
+          case "save":
+            return <SavePanel key={i} />;
           default:
             return null;
         }

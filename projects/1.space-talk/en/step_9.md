@@ -2,7 +2,7 @@
 
 <div style="display: flex; flex-wrap: wrap">
 <div style="flex-basis: 200px; flex-grow: 1; margin-right: 15px;">
-Add the **Tera** sprite and use any of the blocks that you have learned about to make an 'emote' for the **Tera** sprite.
+Add the <strong>terra</strong> sprite and use any of the blocks that you have learned about to make an 'emote' for the <strong>terra</strong> sprite.
 </div>
 <div>
 

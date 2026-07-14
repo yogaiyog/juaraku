@@ -5,6 +5,7 @@ const BLOCK_TYPES = [
   { start: /^---\s*task\s*---\s*$/m, end: /^---\s*\/task\s*---\s*$/m, type: "task" as const },
   { start: /^---\s*print-only\s*---\s*$/m, end: /^---\s*\/print-only\s*---\s*$/m, type: "print-only" as const },
   { start: /^---\s*no-print\s*---\s*$/m, end: /^---\s*\/no-print\s*---\s*$/m, type: "no-print" as const },
+  { start: /^---\s*collapse\s*---\s*$/m, end: /^---\s*\/collapse\s*---\s*$/m, type: "collapse" as const },
 ];
 
 export function splitBlocks3Content(content: string): ContentSegment[] {
@@ -30,6 +31,17 @@ export function splitBlocks3Content(content: string): ContentSegment[] {
   return segments;
 }
 
+function extractCollapseContent(raw: string): { title: string; body: string } {
+  const trimmed = raw.trim();
+  const frontmatterMatch = trimmed.match(/^---\s*\ntitle:\s*(.+?)\s*\n---\s*\n/);
+  if (frontmatterMatch) {
+    const title = frontmatterMatch[1].trim();
+    const body = trimmed.slice(frontmatterMatch[0].length).trim();
+    return { title, body };
+  }
+  return { title: "", body: trimmed };
+}
+
 export function parseStepMarkdown(raw: string): ContentSegment[] {
   const segments: ContentSegment[] = [];
   const remaining = raw;
@@ -40,8 +52,16 @@ export function parseStepMarkdown(raw: string): ContentSegment[] {
 
     const blocks3Match = slice.match(/\n?```blocks3\n([\s\S]*?)```/);
     const blockStart = findEarliestBlockStart(slice);
+    const saveMatch = slice.match(/^---\s*save\s*---\s*$/m);
 
-    if (blocks3Match && (!blockStart || blocks3Match.index! < blockStart.index)) {
+    if (saveMatch && saveMatch.index !== undefined && (!blocks3Match || saveMatch.index < blocks3Match.index!) && (!blockStart || saveMatch.index < blockStart.index)) {
+      const textBefore = slice.slice(0, saveMatch.index).trim();
+      if (textBefore) {
+        segments.push({ type: "markdown", content: textBefore });
+      }
+      segments.push({ type: "save" });
+      pos += saveMatch.index + saveMatch[0].length;
+    } else if (blocks3Match && (!blockStart || blocks3Match.index! < blockStart.index)) {
       const textBefore = slice.slice(0, blocks3Match.index).trim();
       if (textBefore) {
         segments.push({ type: "markdown", content: textBefore });
@@ -62,12 +82,24 @@ export function parseStepMarkdown(raw: string): ContentSegment[] {
         endIndex
       ).trim();
 
-      const subSegments = parseStepMarkdown(content);
-      for (const sub of subSegments) {
-        if (sub.type === "markdown") {
-          segments.push({ type: blockStart.type, content: sub.content } as ContentSegment);
-        } else {
-          segments.push(sub);
+      if (blockStart.type === "collapse") {
+        const { title, body } = extractCollapseContent(content);
+        const subSegments = parseStepMarkdown(body);
+        for (const sub of subSegments) {
+          if (sub.type === "markdown") {
+            segments.push({ type: "collapse", title, content: sub.content });
+          } else {
+            segments.push(sub);
+          }
+        }
+      } else {
+        const subSegments = parseStepMarkdown(content);
+        for (const sub of subSegments) {
+          if (sub.type === "markdown") {
+            segments.push({ type: blockStart.type, content: sub.content } as ContentSegment);
+          } else {
+            segments.push(sub);
+          }
         }
       }
 
@@ -148,12 +180,21 @@ export function parseQuiz(raw: string): QuizQuestion[] {
       .trim();
 
     const imageMatch = text.match(/!\[.*?\]\((.+?)\)/);
-    const questionText = text.replace(/!\[.*?\]\(.+?\)/, "").trim();
+    const textWithoutImage = text.replace(/!\[.*?\]\(.+?\)/, "").trim();
     const image = imageMatch ? imageMatch[1] : undefined;
+
+    const blocks3Match = textWithoutImage.match(/```blocks3\n([\s\S]*?)```/);
+    let questionText = textWithoutImage;
+    let blocks3Code: string | undefined;
+
+    if (blocks3Match) {
+      blocks3Code = blocks3Match[1].trim();
+      questionText = textWithoutImage.replace(/```blocks3\n[\s\S]*?```/, "").trim();
+    }
 
     const choices = parseChoices(afterChoices.replace(/---\s*\/choices\s*---/, ""));
 
-    questions.push({ legend, text: questionText, image, choices });
+    questions.push({ legend, text: questionText, image, choices, blocks3Code });
   }
 
   return questions;
@@ -165,15 +206,35 @@ function parseChoices(raw: string): QuizChoice[] {
 
   for (const block of choiceBlocks) {
     const trimmed = block.trim();
-    const match = trimmed.match(/^- \((.)\)\s+(.+)/);
-    if (!match) continue;
+    const headerMatch = trimmed.match(/^- \((.)\)/);
+    if (!headerMatch) continue;
 
-    const correct = match[1] === "x";
-    const label = match[2].trim();
-    const feedbackMatch = trimmed.match(/---\s*feedback\s*---\n([\s\S]*?)\n---\s*\/feedback\s*---/);
-    const feedback = feedbackMatch ? feedbackMatch[1].trim() : "";
+    const correct = headerMatch[1] === "x";
 
-    choices.push({ correct, label, feedback });
+    const feedbackMatch = trimmed.match(
+      /\s*---\s*feedback\s*---\s*\n([\s\S]*?)\n\s*---\s*\/feedback\s*---/
+    );
+
+    let label: string;
+    let feedback = "";
+
+    if (feedbackMatch) {
+      const feedbackStartIdx = feedbackMatch.index!;
+      label = trimmed.slice(headerMatch[0].length, feedbackStartIdx).trim();
+      feedback = feedbackMatch[1].trim();
+    } else {
+      label = trimmed.slice(headerMatch[0].length).trim();
+    }
+
+    const blocks3Match = label.match(/```blocks3\n([\s\S]*?)```/);
+    let blocks3Code: string | undefined;
+
+    if (blocks3Match) {
+      blocks3Code = blocks3Match[1].trim();
+      label = label.replace(/```blocks3\n[\s\S]*?```/, "").trim();
+    }
+
+    choices.push({ correct, label, feedback, blocks3Code });
   }
 
   return choices;

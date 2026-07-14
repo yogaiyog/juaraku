@@ -35,12 +35,15 @@ export type ContentSegment =
   | { type: "task"; content: string }
   | { type: "print-only"; content: string }
   | { type: "no-print"; content: string }
-  | { type: "blocks3"; code: string };
+  | { type: "blocks3"; code: string }
+  | { type: "collapse"; title: string; content: string }
+  | { type: "save" };
 
 export type QuizChoice = {
   correct: boolean;
   label: string;
   feedback: string;
+  blocks3Code?: string;
 };
 
 export type QuizQuestion = {
@@ -48,6 +51,7 @@ export type QuizQuestion = {
   text: string;
   image?: string;
   choices: QuizChoice[];
+  blocks3Code?: string;
 };
 
 export type Quiz = {

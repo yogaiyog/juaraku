@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import Image from "next/image";
 import type { QuizQuestion } from "@/lib/types";
 import Badge from "./Badge";
+import Blocks3Renderer from "./Blocks3Renderer";
 
 type QuizQuestionWithImage = QuizQuestion & { image?: string };
 
@@ -73,6 +74,12 @@ export default function StepQuiz({ questions }: Props) {
               dangerouslySetInnerHTML={{ __html: question.text }}
             />
 
+            {question.blocks3Code && (
+              <div className="mb-6">
+                <Blocks3Renderer code={question.blocks3Code} />
+              </div>
+            )}
+
             {question.image && (
               <Image
                 src={question.image}
@@ -110,6 +117,9 @@ export default function StepQuiz({ questions }: Props) {
                         className="flex items-center gap-2"
                         dangerouslySetInnerHTML={{ __html: choice.label }}
                       />
+                      {choice.blocks3Code && (
+                        <Blocks3Renderer code={choice.blocks3Code} />
+                      )}
                     </button>
                     {showFeedback && i === selected && (
                       <div
