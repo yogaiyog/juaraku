@@ -1,99 +1,91 @@
-import fs from "node:fs";
-import path from "node:path";
-import { load } from "js-yaml";
+import { createServerSupabase } from "./supabase-server";
+import {
+  getAllProjectsFS,
+  getProjectFS,
+  getProjectMetaFS,
+  getStepContentFS,
+  getProjectDirFS,
+  resolveProjectAssetFS,
+  getStepPathFS,
+} from "./projects-fs";
+import {
+  getAllProjects as getAllProjectsDB,
+  getProject as getProjectDB,
+  getProjectMeta as getProjectMetaDB,
+  getStepContent as getStepContentDB,
+} from "./projects-db";
 import type { Project, ProjectMeta } from "./types";
 
-const PROJECTS_DIR = path.join(process.cwd(), "projects");
+function isDbAvailable(): boolean {
+  return createServerSupabase() !== null;
+}
 
-function parseProjectDir(dirName: string): { index: number; name: string } | null {
+export function parseProjectDir(dirName: string): { index: number; name: string } | null {
   const match = dirName.match(/^(\d+)\.(.+)$/);
   if (!match) return null;
   return { index: Number.parseInt(match[1], 10), name: match[2] };
 }
 
-function getDirectoryMapping(): Map<string, string> {
-  const mapping = new Map<string, string>();
-  if (!fs.existsSync(PROJECTS_DIR)) return mapping;
-  const entries = fs.readdirSync(PROJECTS_DIR, { withFileTypes: true });
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const parsed = parseProjectDir(entry.name);
-    if (parsed) {
-      mapping.set(parsed.name, entry.name);
-    } else {
-      mapping.set(entry.name, entry.name);
+export async function getAllProjects(): Promise<Project[]> {
+  if (isDbAvailable()) {
+    try {
+      const projects = await getAllProjectsDB();
+      if (projects.length > 0) return projects;
+    } catch {
+      // fall through to filesystem
     }
   }
-  return mapping;
-}
-
-export function getProjectDir(projectId: string): string {
-  return getDirectoryMapping().get(projectId) ?? projectId;
-}
-
-export async function getAllProjects(): Promise<Project[]> {
-  const entries = fs.readdirSync(PROJECTS_DIR, { withFileTypes: true });
-  const raw: { project: Project; index: number }[] = [];
-
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const parsed = parseProjectDir(entry.name);
-    const id = parsed ? parsed.name : entry.name;
-    const dirName = entry.name;
-
-    const meta = await getProjectMeta(dirName);
-    if (!meta) continue;
-
-    const stepCount = (meta.steps ?? []).length;
-
-    raw.push({
-      index: parsed?.index ?? 0,
-      project: {
-        id,
-        meta,
-        stepCount,
-        directoryName: dirName,
-      },
-    });
-  }
-
-  raw.sort((a, b) => a.index - b.index);
-  return raw.map((r) => r.project);
+  return getAllProjectsFS();
 }
 
 export async function getProject(id: string): Promise<Project | null> {
-  const dirName = getProjectDir(id);
-  const meta = await getProjectMeta(dirName);
-  if (!meta) return null;
-
-  const stepCount = (meta.steps ?? []).length;
-
-  return {
-    id,
-    meta,
-    stepCount,
-    directoryName: dirName,
-  };
+  if (isDbAvailable()) {
+    try {
+      const proj = await getProjectDB(id);
+      if (proj) return proj;
+    } catch {
+      // fall through to filesystem
+    }
+  }
+  return getProjectFS(id);
 }
 
 export async function getProjectMeta(id: string): Promise<ProjectMeta | null> {
-  const dirName = getProjectDir(id);
-  const metaPath = path.join(PROJECTS_DIR, dirName, "en", "meta.yml");
-  if (!fs.existsSync(metaPath)) return null;
+  if (isDbAvailable()) {
+    try {
+      const meta = await getProjectMetaDB(id);
+      if (meta) return meta;
+    } catch {
+      // fall through to filesystem
+    }
+  }
+  return getProjectMetaFS(id);
+}
 
-  const raw = fs.readFileSync(metaPath, "utf-8");
-  return load(raw) as ProjectMeta;
+export async function getStepContent(
+  projectId: string,
+  stepIndex: number
+): Promise<string | null> {
+  if (isDbAvailable()) {
+    try {
+      const content = await getStepContentDB(projectId, stepIndex);
+      if (content) return content;
+    } catch {
+      // fall through to filesystem
+    }
+  }
+  return getStepContentFS(projectId, stepIndex);
+}
+
+export function getProjectDir(projectId: string): string {
+  return getProjectDirFS(projectId);
 }
 
 export function resolveProjectAsset(
   projectId: string,
   relativePath: string
 ): string {
-  const dirName = getProjectDir(projectId);
-  return path.join(PROJECTS_DIR, dirName, "en", relativePath);
+  return resolveProjectAssetFS(projectId, relativePath);
 }
 
-export function getStepPath(projectId: string, stepIndex: number): string {
-  const dirName = getProjectDir(projectId);
-  return path.join(PROJECTS_DIR, dirName, "en", `step_${stepIndex}.md`);
-}
+export { getStepPathFS as getStepPath };

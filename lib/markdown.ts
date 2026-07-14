@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import type { ContentSegment, QuizQuestion, QuizChoice } from "./types";
 
 const BLOCK_TYPES = [
@@ -148,12 +147,10 @@ export async function getStepContent(
   projectId: string,
   stepIndex: number
 ): Promise<ContentSegment[]> {
-  const { getStepPath } = await import("./projects");
-  const filePath = getStepPath(projectId, stepIndex);
-  if (!fs.existsSync(filePath)) return [];
-  const raw = fs.readFileSync(filePath, "utf-8");
-  const cleaned = raw;
-  return parseStepMarkdown(cleaned);
+  const { getStepContent: getProjectStepContent } = await import("./projects");
+  const raw = await getProjectStepContent(projectId, stepIndex);
+  if (!raw) return [];
+  return parseStepMarkdown(raw);
 }
 
 export function parseQuiz(raw: string): QuizQuestion[] {

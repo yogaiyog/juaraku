@@ -56,6 +56,12 @@ export default function RootLayout({
             >
               Home
             </Link>
+            <Link
+              href="/editor"
+              className="rounded-lg px-3 py-1.5 text-sm font-medium text-scratch-blue transition-colors hover:bg-scratch-blue/10"
+            >
+              Editor
+            </Link>
           </div>
         </header>
         <main className="flex-1">{children}</main>
