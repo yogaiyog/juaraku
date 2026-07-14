@@ -1,0 +1,31 @@
+setup
+
+size when not jumping
+
+not jumping
+
+start other scripts
+
+not in the air
+
+at end
+
+stop other sprites
+
+stop jumping after win
+
+add this block for left to right games
+
+try different numbers
+
+choose a colour on your platform
+
+choose your backdrop colour
+
+prevent jumping after losing
+
+add a sound of your choice
+
+check lose
+
+check win

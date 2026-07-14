@@ -1,0 +1,13 @@
+Start
+
+landed
+
+stop
+
+End
+
+Platform 1
+
+Platfrom 2
+
+Platform 3

@@ -1,0 +1,32 @@
+---
+title: Grow a dragonfly
+hero_image: images/banner.png
+description: Make a dragonfly that grows bigger as it eats annoying mosquitos and other insects.
+pdf: resources/rpi-grow-a-dragonfly.pdf
+meta_title: Scratch coding projects for kids and teens | Grow a dragonfly
+meta_description: Learn Scratch with the Raspberry Pi Foundation's coding projects for kids and teens. Make a Scratch app where a dragonfly grows bigger as it eats insects.
+version: 4
+listed: true
+copyedit: false
+last_tested: '2021-04-27'
+steps:
+  - title: What you will make
+  - title: Set the scene
+  - title: A fly to eat
+    completion:
+      - engaged
+  - title: Grow to full-size
+  - title: Improved movement
+  - title: More food
+    completion:
+      - internal
+  - title: Challenge
+    challenge: true
+  - title: Quick quiz
+    knowledge_quiz:
+      path: quiz1
+      version: 1
+      questions: 3
+      passing_score: 3
+    completion:
+      - external

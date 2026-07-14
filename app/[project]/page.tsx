@@ -44,6 +44,7 @@ export default async function ProjectPage({ params }: Props) {
             src={`/api/assets/${project}/${proj.meta.hero_image}`}
             alt={proj.meta.title}
             fill
+            sizes="(max-width: 1023px) 100vw, 1088px"
             className="object-cover"
           />
           <div className="absolute inset-0 bg-black/30" />

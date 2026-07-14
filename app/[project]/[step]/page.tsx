@@ -3,6 +3,7 @@ import path from "node:path";
 import { getAllProjects, getProject, getProjectDir } from "@/lib/projects";
 import { getStepContent, parseQuiz, parseQuizIntro } from "@/lib/markdown";
 import { renderMarkdown } from "@/lib/render-markdown";
+import { applyTransforms } from "@/lib/transform-images";
 import { notFound } from "next/navigation";
 import StepRenderer from "@/app/_components/StepRenderer";
 import StepQuiz from "@/app/_components/StepQuiz";
@@ -86,8 +87,8 @@ export default async function StepPage({ params }: Props) {
       : undefined,
     choices: q.choices.map((c) => ({
       ...c,
-      label: renderMarkdown(c.label),
-      feedback: renderMarkdown(c.feedback),
+      label: applyTransforms(renderMarkdown(c.label), project),
+      feedback: applyTransforms(renderMarkdown(c.feedback), project),
     })),
   }));
 

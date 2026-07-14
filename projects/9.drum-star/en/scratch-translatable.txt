@@ -1,0 +1,13 @@
+name
+
+What's your rock star name?
+
+beats
+
+Not enough beats!
+
+snare
+
+conga
+
+What's your name?

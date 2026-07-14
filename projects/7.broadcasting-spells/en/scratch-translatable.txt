@@ -1,0 +1,19 @@
+change from 'random position'
+
+in front of the buttons
+
+shrink
+
+negative numbers decrease the size
+
+grow
+
+positive numbers increase the size
+
+toad
+
+untoad
+
+invisible
+
+hide

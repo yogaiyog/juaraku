@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 
 type Props = {
   code: string;
@@ -14,7 +14,7 @@ async function importScratchblocks() {
 }
 
 export default function Blocks3Renderer({ code }: Props) {
-  const ref = useRef<HTMLDivElement>(null);
+  const [svgHtml, setSvgHtml] = useState<string>("");
 
   useEffect(() => {
     let cancelled = false;
@@ -32,17 +32,16 @@ export default function Blocks3Renderer({ code }: Props) {
           stylesAppended = true;
         }
 
-        if (cancelled || !ref.current) return;
+        if (cancelled) return;
 
         const doc = sb.parse(code, { languages: ["en"] });
         const svg = sb.render(doc, { style: "scratch3" });
-        ref.current.innerHTML = "";
-        ref.current.appendChild(svg);
+        setSvgHtml(svg.outerHTML);
       } catch (err) {
         console.error("Failed to render Scratch blocks:", err);
-        if (ref.current) {
-          ref.current.innerHTML = `<pre class="text-red-500 text-sm">Error rendering blocks</pre>`;
-        }
+        setSvgHtml(
+          `<pre class="text-red-500 text-sm">Error rendering blocks</pre>`
+        );
       }
     }
 
@@ -50,5 +49,10 @@ export default function Blocks3Renderer({ code }: Props) {
     return () => { cancelled = true; };
   }, [code]);
 
-  return <div ref={ref} className="my-4 overflow-x-auto" />;
+  return (
+    <div
+      className="my-4 overflow-x-auto"
+      dangerouslySetInnerHTML={{ __html: svgHtml }}
+    />
+  );
 }

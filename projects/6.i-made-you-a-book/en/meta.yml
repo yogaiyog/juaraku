@@ -1,0 +1,23 @@
+---
+title: I made you a book
+hero_image: images/banner.png
+description: Create a book with multiple pages to tell a story or share facts
+meta_title: Scratch coding projects for kids and teens | I made you a book
+meta_description: Learn to code in Scratch with the Raspberry Pi Foundation's coding projects for kids and teens. Make a Scratch digital book for someone you care about.
+pdf: resources/i-made-you-a-book.pdf
+version: 4
+listed: true
+copyedit: false
+last_tested: '2021-03-09'
+steps:
+- title: You will make
+- title: Your idea
+- title: Plan your book 
+- title: Build and test
+  completion:
+  - engaged
+  - internal
+- title: Checklist
+  completion:
+  - external
+- title: Share and play

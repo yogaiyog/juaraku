@@ -9,7 +9,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Scratch Projects",
+  title: "JuaraKu",
   description: "Interactive Scratch coding projects for learning",
 };
 
@@ -42,10 +42,12 @@ export default function RootLayout({
               href="/"
               className="flex items-center gap-2 font-bold text-scratch-blue transition-colors hover:text-scratch-purple"
             >
-              <svg className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
+              {/* <svg className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm3.5 6c.8 0 1.5.7 1.5 1.5s-.7 1.5-1.5 1.5-1.5-.7-1.5-1.5.7-1.5 1.5-1.5zm-7 0c.8 0 1.5.7 1.5 1.5S9.3 11 8.5 11 7 10.3 7 9.5 7.7 8 8.5 8zm3.5 8c-2.5 0-4.5-1.5-5.3-3.5h10.6c-.8 2-2.8 3.5-5.3 3.5z" />
-              </svg>
-              Scratch Projects
+              </svg> */}
+              <img src="/logo.png" alt="Scratch Projects" className="h-6 w-6" />
+
+              JuaraKu
             </Link>
             <div className="flex-1" />
             <Link

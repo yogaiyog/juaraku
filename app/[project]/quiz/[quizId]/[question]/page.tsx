@@ -3,6 +3,7 @@ import path from "node:path";
 import { getAllProjects, getProject, getProjectDir } from "@/lib/projects";
 import { parseQuiz, parseQuizIntro } from "@/lib/markdown";
 import { renderMarkdown } from "@/lib/render-markdown";
+import { applyTransforms } from "@/lib/transform-images";
 import { notFound } from "next/navigation";
 import QuizQuestionsClient from "./QuizQuestionsClient";
 import Badge from "@/app/_components/Badge";
@@ -87,8 +88,8 @@ export default async function QuizPage({ params }: Props) {
     text: renderQuizHtml(currentQuestion.text),
     choices: currentQuestion.choices.map((c) => ({
       ...c,
-      label: renderQuizHtml(c.label),
-      feedback: renderQuizHtml(c.feedback),
+      label: applyTransforms(renderQuizHtml(c.label), project),
+      feedback: applyTransforms(renderQuizHtml(c.feedback), project),
     })),
   };
 

@@ -6,6 +6,7 @@ import Badge from "./Badge";
 type Props = {
   project: Project;
   index: number;
+  priority?: boolean;
 };
 
 const colors = [
@@ -15,7 +16,7 @@ const colors = [
   "bg-scratch-green/5 border-scratch-green/15",
 ];
 
-export default function ProjectCard({ project, index }: Props) {
+export default function ProjectCard({ project, index, priority }: Props) {
   const colorClass = colors[project.id.length % colors.length];
 
   return (
@@ -31,6 +32,8 @@ export default function ProjectCard({ project, index }: Props) {
           src={`/api/assets/${project.id}/${project.meta.hero_image}`}
           alt={project.meta.title}
           fill
+          priority={priority}
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           className="object-cover transition-transform duration-300 group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-black/20 opacity-0 transition-opacity group-hover:opacity-100" />

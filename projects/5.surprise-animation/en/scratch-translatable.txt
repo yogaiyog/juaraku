@@ -1,0 +1,35 @@
+add the sprite's position
+
+<100 is smaller, >100 is bigger
+
+update this for your chosen costume
+
+turn to the left
+
+add blocks to set up the start
+
+starting size
+
+starting position
+
+change the number to create your time delay
+
+setup
+
+curiosity
+
+reaction
+
+reset
+
+surprise
+
+Hmm...
+
+BOO!
+
+What ever is this?
+
+Kitty, have you been messing with my potions again?
+
+Cat gotta haz milk.
