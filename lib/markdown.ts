@@ -1,4 +1,4 @@
-import fs from "node:fs";
+import { getFileText } from "./minio";
 import type { ContentSegment, QuizQuestion, QuizChoice } from "./types";
 
 const BLOCK_TYPES = [
@@ -149,11 +149,10 @@ export async function getStepContent(
   stepIndex: number
 ): Promise<ContentSegment[]> {
   const { getStepPath } = await import("./projects");
-  const filePath = getStepPath(projectId, stepIndex);
-  if (!fs.existsSync(filePath)) return [];
-  const raw = fs.readFileSync(filePath, "utf-8");
-  const cleaned = raw;
-  return parseStepMarkdown(cleaned);
+  const minioKey = await getStepPath(projectId, stepIndex);
+  const raw = await getFileText(minioKey);
+  if (!raw) return [];
+  return parseStepMarkdown(raw);
 }
 
 export function parseQuiz(raw: string): QuizQuestion[] {

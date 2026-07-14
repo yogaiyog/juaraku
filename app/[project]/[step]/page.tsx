@@ -1,5 +1,4 @@
-import fs from "node:fs";
-import path from "node:path";
+import { getFileText } from "@/lib/minio";
 import { getAllProjects, getProject, getProjectDir } from "@/lib/projects";
 import { getStepContent, parseQuiz, parseQuizIntro } from "@/lib/markdown";
 import { renderMarkdown } from "@/lib/render-markdown";
@@ -55,19 +54,13 @@ export default async function StepPage({ params }: Props) {
   const quizQuestions: ReturnType<typeof parseQuiz> = [];
 
   if (stepMeta.knowledge_quiz) {
-    const quizDir = path.join(
-      process.cwd(),
-      "projects",
-      getProjectDir(project),
-      "en",
-      stepMeta.knowledge_quiz.path
-    );
+    const dirName = await getProjectDir(project);
 
     for (let q = 1; q <= stepMeta.knowledge_quiz.questions; q++) {
-      const filePath = path.join(quizDir, `question_${q}.md`);
-      if (!fs.existsSync(filePath)) continue;
+      const minioKey = `projects/${dirName}/en/${stepMeta.knowledge_quiz.path}/question_${q}.md`;
+      const raw = await getFileText(minioKey);
+      if (!raw) continue;
 
-      const raw = fs.readFileSync(filePath, "utf-8");
       if (q === 1) {
         quizIntro = parseQuizIntro(raw);
       }

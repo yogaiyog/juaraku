@@ -6,9 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "sync": "tsx --env-file=.env scripts/sync-to-minio.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1087.0",
+    "@supabase/supabase-js": "^2.109.0",
     "js-yaml": "^5.2.1",
     "next": "16.2.10",
     "react": "19.2.4",
@@ -16,7 +19,8 @@
     "remark-html": "^16.0.1",
     "remark-parse": "^11.0.0",
     "scratchblocks": "^3.7.0",
-    "unified": "^11.0.5"
+    "unified": "^11.0.5",
+    "ws": "^8.21.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -25,9 +29,11 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/ws": "^8.18.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",
+    "tsx": "^4.23.1",
     "typescript": "^5"
   }
 }

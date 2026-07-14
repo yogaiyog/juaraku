@@ -1,3 +1,0 @@
-means the health variable must be bigger than 0
-
-means the health variable must be smaller than 5
