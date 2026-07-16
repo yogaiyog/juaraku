@@ -12,6 +12,14 @@ function withCache<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
   return promise;
 }
 
+export function invalidateProjectCache() {
+  cache.delete("all-projects");
+}
+
+export function invalidatePathCache() {
+  cache.delete("paths");
+}
+
 function parseSteps(steps: {
   stepNumber: number;
   title: string;
@@ -96,6 +104,7 @@ export async function getAllProjects(): Promise<Project[]> {
       include: {
         steps: true,
         categories: { include: { category: true } },
+        paths: { include: { path: true }, orderBy: { pathIndex: "asc" } },
       },
       orderBy: { dirIndex: "asc" },
     });
@@ -106,6 +115,12 @@ export async function getAllProjects(): Promise<Project[]> {
         name: pc.category.name,
         slug: pc.category.slug,
       }));
+      const paths: Path[] = row.paths.map((pp) => ({
+        id: pp.path.id,
+        name: pp.path.name,
+        slug: pp.path.slug,
+        description: pp.path.description,
+      }));
       const meta = buildMeta(row.steps, row);
       return {
         id: row.slug,
@@ -113,6 +128,7 @@ export async function getAllProjects(): Promise<Project[]> {
         stepCount: meta.steps.length,
         directoryName: row.dirName,
         categories,
+        paths,
       };
     });
   });
@@ -125,6 +141,7 @@ export async function getProject(id: string): Promise<Project | null> {
       include: {
         steps: true,
         categories: { include: { category: true } },
+        paths: { include: { path: true }, orderBy: { pathIndex: "asc" } },
       },
     });
 
@@ -135,6 +152,12 @@ export async function getProject(id: string): Promise<Project | null> {
       name: pc.category.name,
       slug: pc.category.slug,
     }));
+    const paths: Path[] = row.paths.map((pp) => ({
+      id: pp.path.id,
+      name: pp.path.name,
+      slug: pp.path.slug,
+      description: pp.path.description,
+    }));
     const meta = buildMeta(row.steps, row);
     return {
       id: row.slug,
@@ -142,6 +165,7 @@ export async function getProject(id: string): Promise<Project | null> {
       stepCount: meta.steps.length,
       directoryName: row.dirName,
       categories,
+      paths,
     };
   });
 }

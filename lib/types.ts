@@ -42,6 +42,7 @@ export type Project = {
   stepCount: number;
   directoryName: string;
   categories: Category[];
+  paths: Path[];
   pathIndex?: number;
 };
 
