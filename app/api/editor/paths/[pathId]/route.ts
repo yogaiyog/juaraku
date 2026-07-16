@@ -17,7 +17,7 @@ export async function PUT(
     }
 
     const body = await req.json();
-    const { name, description } = body;
+    const { name, description, projectIds } = body;
 
     if (!name || typeof name !== "string" || name.trim() === "") {
       return NextResponse.json(
@@ -40,6 +40,19 @@ export async function PUT(
         description: description?.trim() || null,
       },
     });
+
+    if (Array.isArray(projectIds)) {
+      await prisma.projectPath.deleteMany({ where: { pathId } });
+      if (projectIds.length > 0) {
+        await prisma.projectPath.createMany({
+          data: projectIds.map((pid: string, index: number) => ({
+            pathId,
+            projectId: pid,
+            pathIndex: index,
+          })),
+        });
+      }
+    }
 
     invalidatePathCache();
     invalidateProjectCache();
