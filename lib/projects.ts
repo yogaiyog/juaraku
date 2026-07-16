@@ -1,7 +1,6 @@
-import { supabase } from "./supabase";
+import { prisma } from "./prisma";
 import type { Category, Path, Project, ProjectMeta, StepEntry } from "./types";
 
-// In-memory cache for metadata (TTL 60s)
 const cache = new Map<string, { data: Promise<unknown>; expiry: number }>();
 const CACHE_TTL = 60_000;
 
@@ -13,97 +12,106 @@ function withCache<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
   return promise;
 }
 
-type StepRow = {
-  step_number: number;
+function parseSteps(steps: {
+  stepNumber: number;
   title: string;
-  completion: string[] | null;
-  has_quiz: boolean;
-  quiz_path: string | null;
-  quiz_version: number | null;
-  quiz_questions: number | null;
-  quiz_passing_score: number | null;
-  is_challenge: boolean;
-};
-
-function parseSteps(rows: unknown[]): StepEntry[] {
-  const steps = rows as StepRow[];
-  steps.sort((a, b) => a.step_number - b.step_number);
+  completion: unknown;
+  hasQuiz: boolean;
+  quizPath: string | null;
+  quizVersion: number | null;
+  quizQuestions: number | null;
+  quizPassingScore: number | null;
+  isChallenge: boolean;
+}[]): StepEntry[] {
+  steps.sort((a, b) => a.stepNumber - b.stepNumber);
   return steps.map((s) => {
     const entry: StepEntry = { title: s.title };
-    if (s.completion) entry.completion = s.completion;
-    if (s.has_quiz && s.quiz_path) {
+    if (s.completion) entry.completion = s.completion as string[];
+    if (s.hasQuiz && s.quizPath) {
       entry.knowledge_quiz = {
-        path: s.quiz_path,
-        version: s.quiz_version ?? 1,
-        questions: s.quiz_questions ?? 0,
-        passing_score: s.quiz_passing_score ?? 0,
+        path: s.quizPath,
+        version: s.quizVersion ?? 1,
+        questions: s.quizQuestions ?? 0,
+        passing_score: s.quizPassingScore ?? 0,
       };
     }
     return entry;
   });
 }
 
-function parseCategories(row: unknown): Category[] {
-  const pc = row as { project_categories?: { categories?: { id: string; name: string; slug: string } }[] };
-  return (pc.project_categories ?? [])
-    .map((pc) => pc.categories)
-    .filter(Boolean) as Category[];
-}
-
-function buildMeta(row: StepRow[] | null, data: {
-  title: string;
-  hero_image: string | null;
-  description: string | null;
-  listed: boolean | null;
-  copyedit: boolean | null;
-  last_tested: string | null;
-  version: number | null;
-  meta_title: string | null;
-  meta_description: string | null;
-  pdf: string | null;
-}): ProjectMeta {
-  const metaSteps = parseSteps(row ?? []);
+function buildMeta(
+  steps: {
+    stepNumber: number;
+    title: string;
+    completion: unknown;
+    hasQuiz: boolean;
+    quizPath: string | null;
+    quizVersion: number | null;
+    quizQuestions: number | null;
+    quizPassingScore: number | null;
+    isChallenge: boolean;
+  }[] | null,
+  data: {
+    title: string;
+    heroImage: string | null;
+    description: string | null;
+    listed: boolean | null;
+    copyedit: boolean | null;
+    lastTested: Date | null;
+    version: number | null;
+    metaTitle: string | null;
+    metaDescription: string | null;
+    pdf: string | null;
+  }
+): ProjectMeta {
+  const metaSteps = parseSteps(steps ?? []);
   return {
     title: data.title,
-    hero_image: data.hero_image ?? "",
+    hero_image: data.heroImage ?? "",
     description: data.description ?? "",
     listed: data.listed ?? true,
     copyedit: data.copyedit ?? false,
-    last_tested: data.last_tested ?? "",
+    last_tested: data.lastTested
+      ? new Date(data.lastTested).toISOString().slice(0, 10)
+      : "",
     version: data.version ?? undefined,
-    meta_title: data.meta_title ?? undefined,
-    meta_description: data.meta_description ?? undefined,
+    meta_title: data.metaTitle ?? undefined,
+    meta_description: data.metaDescription ?? undefined,
     pdf: data.pdf ?? undefined,
     steps: metaSteps,
   };
 }
 
 export async function getProjectDir(projectId: string): Promise<string> {
-  const { data } = await supabase
-    .from("projects")
-    .select("dir_name")
-    .eq("slug", projectId)
-    .single();
-  return data?.dir_name ?? projectId;
+  const project = await prisma.project.findUnique({
+    where: { slug: projectId },
+    select: { dirName: true },
+  });
+  return project?.dirName ?? projectId;
 }
 
 export async function getAllProjects(): Promise<Project[]> {
   return withCache("all-projects", async () => {
-    const { data: projects } = await supabase
-      .from("projects")
-      .select("*, steps(*), project_categories(categories(*))")
-      .order("dir_index");
-
-    if (!projects) return [];
+    const projects = await prisma.project.findMany({
+      include: {
+        steps: true,
+        categories: { include: { category: true } },
+      },
+      orderBy: { dirIndex: "asc" },
+    });
 
     return projects.map((row) => {
-      const categories = parseCategories(row);
+      const categories: Category[] = row.categories.map((pc) => ({
+        id: pc.category.id,
+        name: pc.category.name,
+        slug: pc.category.slug,
+      }));
       const meta = buildMeta(row.steps, row);
       return {
         id: row.slug,
         meta,
         stepCount: meta.steps.length,
-        directoryName: row.dir_name,
+        directoryName: row.dirName,
         categories,
       };
     });
@@ -112,21 +120,27 @@ export async function getAllProjects(): Promise<Project[]> {
 
 export async function getProject(id: string): Promise<Project | null> {
   return withCache(`project-${id}`, async () => {
-    const { data: row } = await supabase
-      .from("projects")
-      .select("*, steps(*), project_categories(categories(*))")
-      .eq("slug", id)
-      .single();
+    const row = await prisma.project.findUnique({
+      where: { slug: id },
+      include: {
+        steps: true,
+        categories: { include: { category: true } },
+      },
+    });
 
     if (!row) return null;
 
-    const categories = parseCategories(row);
+    const categories: Category[] = row.categories.map((pc) => ({
+      id: pc.category.id,
+      name: pc.category.name,
+      slug: pc.category.slug,
+    }));
     const meta = buildMeta(row.steps, row);
     return {
       id: row.slug,
       meta,
       stepCount: meta.steps.length,
-      directoryName: row.dir_name,
+      directoryName: row.dirName,
       categories,
     };
   });
@@ -157,111 +171,137 @@ export async function getStepPath(
   return `projects/${dirName}/en/step_${stepIndex}.md`;
 }
 
-// --- Category functions ---
-
 export async function getCategories(): Promise<Category[]> {
   return withCache("categories", async () => {
-    const { data } = await supabase
-      .from("categories")
-      .select("*")
-      .order("name");
-    return (data ?? []) as Category[];
+    const categories = await prisma.category.findMany({
+      orderBy: { name: "asc" },
+    });
+    return categories;
   });
 }
 
-export async function getProjectsByCategory(categorySlug: string): Promise<Project[]> {
-  const { data: category } = await supabase
-    .from("categories")
-    .select("id")
-    .eq("slug", categorySlug)
-    .single();
+export async function getProjectsByCategory(
+  categorySlug: string
+): Promise<Project[]> {
+  const category = await prisma.category.findUnique({
+    where: { slug: categorySlug },
+  });
 
   if (!category) return [];
 
-  const { data: projectIds } = await supabase
-    .from("project_categories")
-    .select("project_id")
-    .eq("category_id", category.id);
+  const projectCategories = await prisma.projectCategory.findMany({
+    where: { categoryId: category.id },
+    select: { projectId: true },
+  });
 
-  if (!projectIds || projectIds.length === 0) return [];
+  if (projectCategories.length === 0) return [];
 
-  const ids = projectIds.map((r) => r.project_id);
+  const ids = projectCategories.map((pc) => pc.projectId);
 
-  const { data: projects } = await supabase
-    .from("projects")
-    .select("*, steps(*), project_categories(categories(*))")
-    .in("id", ids)
-    .order("dir_index");
-
-  if (!projects) return [];
+  const projects = await prisma.project.findMany({
+    where: { id: { in: ids } },
+    include: {
+      steps: true,
+      categories: { include: { category: true } },
+    },
+    orderBy: { dirIndex: "asc" },
+  });
 
   return projects.map((row) => {
-    const categories = parseCategories(row);
+    const cats: Category[] = row.categories.map((pc) => ({
+      id: pc.category.id,
+      name: pc.category.name,
+      slug: pc.category.slug,
+    }));
     const meta = buildMeta(row.steps, row);
     return {
       id: row.slug,
       meta,
       stepCount: meta.steps.length,
-      directoryName: row.dir_name,
-      categories,
+      directoryName: row.dirName,
+      categories: cats,
     };
   });
 }
 
-// --- Path functions ---
-
 export async function getPaths(): Promise<Path[]> {
   return withCache("paths", async () => {
-    const { data } = await supabase
-      .from("paths")
-      .select("*")
-      .order("name");
-    return (data ?? []) as Path[];
+    const paths = await prisma.path.findMany({
+      orderBy: { name: "asc" },
+    });
+    return paths;
   });
 }
 
 export async function getProjectsByPath(pathSlug: string): Promise<Project[]> {
-  const { data: path } = await supabase
-    .from("paths")
-    .select("id")
-    .eq("slug", pathSlug)
-    .single();
+  const path = await prisma.path.findUnique({
+    where: { slug: pathSlug },
+  });
 
   if (!path) return [];
 
-  const { data: projectPaths } = await supabase
-    .from("project_paths")
-    .select("project_id, path_index")
-    .eq("path_id", path.id)
-    .order("path_index");
+  const projectPaths = await prisma.projectPath.findMany({
+    where: { pathId: path.id },
+    select: { projectId: true, pathIndex: true },
+    orderBy: { pathIndex: "asc" },
+  });
 
-  if (!projectPaths || projectPaths.length === 0) return [];
+  if (projectPaths.length === 0) return [];
 
-  const ids = projectPaths.map((r) => r.project_id);
-  const indexMap = new Map(projectPaths.map((r) => [r.project_id, r.path_index]));
+  const ids = projectPaths.map((pp) => pp.projectId);
+  const indexMap = new Map(projectPaths.map((pp) => [pp.projectId, pp.pathIndex]));
 
-  const { data: projects } = await supabase
-    .from("projects")
-    .select("*, steps(*), project_categories(categories(*))")
-    .in("id", ids)
-    .order("dir_index");
-
-  if (!projects) return [];
+  const projects = await prisma.project.findMany({
+    where: { id: { in: ids } },
+    include: {
+      steps: true,
+      categories: { include: { category: true } },
+    },
+    orderBy: { dirIndex: "asc" },
+  });
 
   return projects
     .map((row) => {
-      const categories = parseCategories(row);
+      const cats: Category[] = row.categories.map((pc) => ({
+        id: pc.category.id,
+        name: pc.category.name,
+        slug: pc.category.slug,
+      }));
       const meta = buildMeta(row.steps, row);
       return {
         id: row.slug,
         meta,
         stepCount: meta.steps.length,
-        directoryName: row.dir_name,
-        categories,
+        directoryName: row.dirName,
+        categories: cats,
         pathIndex: indexMap.get(row.id) ?? 0,
       };
     })
     .sort((a, b) => (a.pathIndex ?? 0) - (b.pathIndex ?? 0));
+}
+
+export async function getStepRawContent(
+  projectId: string,
+  stepIndex: number
+): Promise<string | null> {
+  const project = await prisma.project.findUnique({
+    where: { slug: projectId },
+    select: { id: true },
+  });
+
+  if (!project) return null;
+
+  const step = await prisma.step.findUnique({
+    where: {
+      projectId_stepNumber: {
+        projectId: project.id,
+        stepNumber: stepIndex,
+      },
+    },
+    select: { content: true },
+  });
+
+  return step?.content ?? null;
 }
 
 export function invalidateCache(projectId?: string) {

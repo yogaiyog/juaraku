@@ -46,6 +46,7 @@ export default async function ProjectPage({ params }: Props) {
             fill
             sizes="(max-width: 1023px) 100vw, 1088px"
             className="object-cover"
+            loading="eager"
           />
           <div className="absolute inset-0 bg-black/30" />
           <div className="absolute bottom-0 left-0 right-0 p-6">

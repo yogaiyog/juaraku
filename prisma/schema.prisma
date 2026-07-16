@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  name          String?
+  emailVerified DateTime? @map("email_verified")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  sessions      Session[]
+
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Project {
+  id              String           @id @default(uuid())
+  slug            String           @unique
+  dirName         String           @unique @map("dir_name")
+  dirIndex        Int              @default(0) @map("dir_index")
+  title           String
+  heroImage       String?          @map("hero_image")
+  description     String?
+  metaTitle       String?          @map("meta_title")
+  metaDescription String?          @map("meta_description")
+  pdf             String?
+  listed          Boolean          @default(true)
+  copyedit        Boolean          @default(false)
+  lastTested      DateTime?        @map("last_tested")
+  version         Int?
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  steps           Step[]
+  assets          Asset[]
+  categories      ProjectCategory[]
+  paths           ProjectPath[]
+
+  @@map("projects")
+}
+
+model Step {
+  id               String   @id @default(uuid())
+  projectId        String   @map("project_id")
+  stepNumber       Int      @map("step_number")
+  title            String
+  completion       Json?
+  hasQuiz          Boolean  @default(false) @map("has_quiz")
+  quizPath         String?  @map("quiz_path")
+  quizVersion      Int?     @map("quiz_version")
+  quizQuestions    Int?     @map("quiz_questions")
+  quizPassingScore Int?     @map("quiz_passing_score")
+  isChallenge      Boolean  @default(false) @map("is_challenge")
+  content          String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, stepNumber])
+  @@map("steps")
+}
+
+model Asset {
+  id        String   @id @default(uuid())
+  projectId String   @map("project_id")
+  filePath  String   @map("file_path")
+  fileName  String   @map("file_name")
+  mimeType  String   @map("mime_type")
+  size      BigInt?
+  minioKey  String   @map("minio_key")
+  createdAt DateTime @default(now()) @map("created_at")
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, filePath])
+  @@map("assets")
+}
+
+model Category {
+  id        String             @id @default(uuid())
+  name      String             @unique
+  slug      String             @unique
+  createdAt DateTime           @default(now()) @map("created_at")
+  projects  ProjectCategory[]
+
+  @@map("categories")
+}
+
+model ProjectCategory {
+  projectId  String   @map("project_id")
+  categoryId String   @map("category_id")
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, categoryId])
+  @@map("project_categories")
+}
+
+model Path {
+  id          String        @id @default(uuid())
+  name        String
+  slug        String        @unique
+  description String?
+  createdAt   DateTime      @default(now()) @map("created_at")
+  projects    ProjectPath[]
+
+  @@map("paths")
+}
+
+model ProjectPath {
+  projectId String  @map("project_id")
+  pathId    String  @map("path_id")
+  pathIndex Int     @default(0) @map("path_index")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  path      Path    @relation(fields: [pathId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, pathId])
+  @@map("project_paths")
+}

@@ -1,5 +1,5 @@
 /**
- * Sync script: Upload local projects/ to MinIO + populate Supabase DB
+ * Sync script: Upload local projects/ to MinIO + populate DB via Prisma
  *
  * Usage:
  *   npm run sync                    → sync all projects
@@ -10,7 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { load } from "js-yaml";
 import { uploadFile, getMimeType } from "../lib/minio";
-import { supabase } from "../lib/supabase";
+import { prisma } from "../lib/prisma";
 import type { ProjectMeta, StepEntry } from "../lib/types";
 
 const PROJECTS_DIR = path.join(process.cwd(), "projects");
@@ -44,24 +44,20 @@ export async function syncProject(dirName: string) {
   const projectDir = path.join(PROJECTS_DIR, dirName);
   const minioPrefix = `projects/${dirName}`;
 
-  // Determine dir_index from DB (not from folder name)
-  const { data: existing } = await supabase
-    .from("projects")
-    .select("id, dir_index")
-    .eq("slug", slug)
-    .single();
+  const existing = await prisma.project.findUnique({
+    where: { slug },
+    select: { id: true, dirIndex: true },
+  });
 
   let dirIndex: number;
   if (existing) {
-    dirIndex = existing.dir_index;
+    dirIndex = existing.dirIndex;
   } else {
-    const { data: maxRow } = await supabase
-      .from("projects")
-      .select("dir_index")
-      .order("dir_index", { ascending: false })
-      .limit(1)
-      .single();
-    dirIndex = (maxRow?.dir_index ?? 0) + 1;
+    const maxRow = await prisma.project.findFirst({
+      orderBy: { dirIndex: "desc" },
+      select: { dirIndex: true },
+    });
+    dirIndex = (maxRow?.dirIndex ?? 0) + 1;
   }
 
   console.log(`\n📦 Syncing: ${dirName} (slug: ${slug}, index: ${dirIndex})`);
@@ -92,73 +88,66 @@ export async function syncProject(dirName: string) {
   const metaRaw = fs.readFileSync(metaPath, "utf-8");
   const meta = load(metaRaw) as ProjectMeta;
 
-  // 3. Upsert project to Supabase
-  const { data: existingProject } = await supabase
-    .from("projects")
-    .select("id")
-    .eq("slug", slug)
-    .single();
-
+  // 3. Upsert project
   const projectData = {
     slug,
-    dir_name: dirName,
-    dir_index: dirIndex,
+    dirName,
+    dirIndex,
     title: meta.title,
-    hero_image: meta.hero_image ?? null,
+    heroImage: meta.hero_image ?? null,
     description: typeof meta.description === "string" ? meta.description : null,
-    meta_title: meta.meta_title ?? null,
-    meta_description: meta.meta_description ?? null,
+    metaTitle: meta.meta_title ?? null,
+    metaDescription: meta.meta_description ?? null,
     pdf: meta.pdf ?? null,
     listed: meta.listed ?? true,
     copyedit: meta.copyedit ?? false,
-    last_tested: meta.last_tested ?? null,
+    lastTested: meta.last_tested ? new Date(meta.last_tested) : null,
     version: meta.version ?? null,
-    updated_at: new Date().toISOString(),
+    updatedAt: new Date(),
   };
 
   let projectId: string;
 
-  if (existingProject) {
-    const { data } = await supabase
-      .from("projects")
-      .update(projectData)
-      .eq("id", existingProject.id)
-      .select("id")
-      .single();
-    projectId = data!.id;
+  if (existing) {
+    const updated = await prisma.project.update({
+      where: { id: existing.id },
+      data: projectData,
+      select: { id: true },
+    });
+    projectId = updated.id;
     console.log(`  📝 Updated project in DB`);
   } else {
-    const { data } = await supabase
-      .from("projects")
-      .insert(projectData)
-      .select("id")
-      .single();
-    projectId = data!.id;
+    const created = await prisma.project.create({
+      data: projectData,
+      select: { id: true },
+    });
+    projectId = created.id;
     console.log(`  🆕 Created project in DB`);
   }
 
   // 4. Sync steps
   const steps = meta.steps ?? [];
 
-  // Delete existing steps first
-  await supabase.from("steps").delete().eq("project_id", projectId);
+  await prisma.step.deleteMany({ where: { projectId } });
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
     const stepNumber = i + 1;
     const hasQuiz = !!step.knowledge_quiz;
 
-    await supabase.from("steps").insert({
-      project_id: projectId,
-      step_number: stepNumber,
-      title: step.title,
-      completion: step.completion ?? null,
-      has_quiz: hasQuiz,
-      quiz_path: step.knowledge_quiz?.path ?? null,
-      quiz_version: step.knowledge_quiz?.version ?? null,
-      quiz_questions: step.knowledge_quiz?.questions ?? null,
-      quiz_passing_score: step.knowledge_quiz?.passing_score ?? null,
-      is_challenge: (step as StepEntry & { challenge?: boolean }).challenge ?? false,
+    await prisma.step.create({
+      data: {
+        projectId,
+        stepNumber,
+        title: step.title,
+        completion: step.completion ?? undefined,
+        hasQuiz,
+        quizPath: step.knowledge_quiz?.path ?? null,
+        quizVersion: step.knowledge_quiz?.version ?? null,
+        quizQuestions: step.knowledge_quiz?.questions ?? null,
+        quizPassingScore: step.knowledge_quiz?.passing_score ?? null,
+        isChallenge: (step as StepEntry & { challenge?: boolean }).challenge ?? false,
+      },
     });
   }
   console.log(`  📝 Synced ${steps.length} steps`);
@@ -166,21 +155,22 @@ export async function syncProject(dirName: string) {
   // 5. Sync assets
   const assetFiles = files.filter((f) => !f.endsWith(".md") && !f.endsWith(".yml"));
 
-  // Delete existing assets first
-  await supabase.from("assets").delete().eq("project_id", projectId);
+  await prisma.asset.deleteMany({ where: { projectId } });
 
   for (const file of assetFiles) {
     const stat = fs.statSync(path.join(projectDir, file));
     const minioKey = `${minioPrefix}/${file}`;
     const fileName = path.basename(file);
 
-    await supabase.from("assets").insert({
-      project_id: projectId,
-      file_path: file,
-      file_name: fileName,
-      mime_type: getMimeType(file),
-      size: stat.size,
-      minio_key: minioKey,
+    await prisma.asset.create({
+      data: {
+        projectId,
+        filePath: file,
+        fileName,
+        mimeType: getMimeType(file),
+        size: BigInt(stat.size),
+        minioKey,
+      },
     });
   }
   console.log(`  📝 Synced ${assetFiles.length} assets`);
@@ -199,7 +189,6 @@ function resolveDirectories(filter?: string): string[] {
 
   if (!filter) return directories;
 
-  // Match by slug (e.g. "music-maker") or dir name (e.g. "1.space-talk")
   const matched = directories.filter((dir) => {
     const parsed = parseProjectDir(dir);
     const slug = parsed?.name ?? dir;
@@ -208,7 +197,9 @@ function resolveDirectories(filter?: string): string[] {
 
   if (matched.length === 0) {
     console.error(`❌ Project not found: "${filter}"`);
-    console.error(`   Available: ${directories.map((d) => parseProjectDir(d)?.name ?? d).join(", ")}`);
+    console.error(
+      `   Available: ${directories.map((d) => parseProjectDir(d)?.name ?? d).join(", ")}`
+    );
     process.exit(1);
   }
 
@@ -219,7 +210,7 @@ async function main() {
   const filter = process.argv[2];
   const label = filter ? `"${filter}"` : "all";
 
-  console.log(`🚀 Starting sync to MinIO + Supabase (${label})\n`);
+  console.log(`🚀 Starting sync to MinIO + DB (${label})\n`);
 
   if (!fs.existsSync(PROJECTS_DIR)) {
     console.error("❌ projects/ directory not found");
