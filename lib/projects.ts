@@ -325,7 +325,8 @@ export async function getStepRawContent(
     select: { content: true },
   });
 
-  return step?.content ?? null;
+  if (!step) return null;
+  return step.content ?? "";
 }
 
 export function invalidateCache(projectId?: string) {
