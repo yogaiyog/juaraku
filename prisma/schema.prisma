@@ -45,6 +45,7 @@ model Project {
   copyedit        Boolean          @default(false)
   lastTested      DateTime?        @map("last_tested")
   version         Int?
+  certificate     String?
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
   steps           Step[]

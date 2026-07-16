@@ -9,7 +9,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "sync": "tsx --env-file=.env scripts/sync-to-minio.ts"
+    "sync": "tsx --env-file=.env scripts/sync-to-minio.ts",
+    "sync-local": "dotenv -e .env.local -- tsx scripts/sync-to-minio.ts",
+    "sync-content": "dotenv -e .env -e .env.development -- tsx scripts/sync-content-from-minio.ts",
+    "sync-content-local": "dotenv -e .env -e .env.local -- tsx scripts/sync-content-from-minio.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1087.0",

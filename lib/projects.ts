@@ -166,6 +166,7 @@ export async function getProject(id: string): Promise<Project | null> {
       directoryName: row.dirName,
       categories,
       paths,
+      certificate: row.certificate,
     };
   });
 }

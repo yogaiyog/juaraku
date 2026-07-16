@@ -44,6 +44,7 @@ export type Project = {
   categories: Category[];
   paths: Path[];
   pathIndex?: number;
+  certificate?: string | null;
 };
 
 export type ContentSegment =

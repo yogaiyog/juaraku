@@ -3,6 +3,7 @@ import { Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import Providers from "./_components/providers";
 import AuthHeader from "./_components/auth-header";
+import FooterCertificate from "./_components/FooterCertificate";
 import "./globals.css";
 
 const geistMono = Geist_Mono({
@@ -53,6 +54,12 @@ export default function RootLayout({
             </div>
           </header>
           <main className="flex-1">{children}</main>
+          <footer className="border-t border-zinc-200/80 bg-zinc-50/50 py-6 dark:border-zinc-800/80 dark:bg-zinc-950/50">
+            <div className="mx-auto flex max-w-[90rem] items-center justify-center gap-4 px-4 sm:px-6 lg:px-8">
+              <p className="text-sm text-zinc-500">Juaraku &copy; 2026</p>
+              <FooterCertificate />
+            </div>
+          </footer>
         </Providers>
       </body>
     </html>
