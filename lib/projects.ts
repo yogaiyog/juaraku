@@ -228,6 +228,7 @@ export async function getProjectsByCategory(
     include: {
       steps: true,
       categories: { include: { category: true } },
+      paths: { include: { path: true }, orderBy: { pathIndex: "asc" } },
     },
     orderBy: { dirIndex: "asc" },
   });
@@ -238,6 +239,12 @@ export async function getProjectsByCategory(
       name: pc.category.name,
       slug: pc.category.slug,
     }));
+    const pths: Path[] = row.paths.map((pp) => ({
+      id: pp.path.id,
+      name: pp.path.name,
+      slug: pp.path.slug,
+      description: pp.path.description,
+    }));
     const meta = buildMeta(row.steps, row);
     return {
       id: row.slug,
@@ -245,6 +252,7 @@ export async function getProjectsByCategory(
       stepCount: meta.steps.length,
       directoryName: row.dirName,
       categories: cats,
+      paths: pths,
     };
   });
 }
@@ -281,6 +289,7 @@ export async function getProjectsByPath(pathSlug: string): Promise<Project[]> {
     include: {
       steps: true,
       categories: { include: { category: true } },
+      paths: { include: { path: true }, orderBy: { pathIndex: "asc" } },
     },
     orderBy: { dirIndex: "asc" },
   });
@@ -292,6 +301,12 @@ export async function getProjectsByPath(pathSlug: string): Promise<Project[]> {
         name: pc.category.name,
         slug: pc.category.slug,
       }));
+      const pths: Path[] = row.paths.map((pp) => ({
+        id: pp.path.id,
+        name: pp.path.name,
+        slug: pp.path.slug,
+        description: pp.path.description,
+      }));
       const meta = buildMeta(row.steps, row);
       return {
         id: row.slug,
@@ -299,6 +314,7 @@ export async function getProjectsByPath(pathSlug: string): Promise<Project[]> {
         stepCount: meta.steps.length,
         directoryName: row.dirName,
         categories: cats,
+        paths: pths,
         pathIndex: indexMap.get(row.id) ?? 0,
       };
     })
