@@ -6,7 +6,7 @@
     "dev": "next dev",
     "dev:local": "dotenv -e .env.local -- next dev",
     "dev:supabase": "dotenv -e .env.development -- next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
     "sync": "tsx --env-file=.env scripts/sync-to-minio.ts",
