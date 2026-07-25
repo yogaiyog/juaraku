@@ -129,6 +129,8 @@ export async function getAllProjects(): Promise<Project[]> {
         directoryName: row.dirName,
         categories,
         paths,
+        pathIndex: undefined,
+        certificate: null,
       };
     });
   });
@@ -166,6 +168,7 @@ export async function getProject(id: string): Promise<Project | null> {
       directoryName: row.dirName,
       categories,
       paths,
+      pathIndex: undefined,
       certificate: row.certificate,
     };
   });
@@ -245,6 +248,9 @@ export async function getProjectsByCategory(
       stepCount: meta.steps.length,
       directoryName: row.dirName,
       categories: cats,
+      paths: [],
+      pathIndex: undefined,
+      certificate: null,
     };
   });
 }
@@ -299,7 +305,9 @@ export async function getProjectsByPath(pathSlug: string): Promise<Project[]> {
         stepCount: meta.steps.length,
         directoryName: row.dirName,
         categories: cats,
+        paths: [],
         pathIndex: indexMap.get(row.id) ?? 0,
+        certificate: null,
       };
     })
     .sort((a, b) => (a.pathIndex ?? 0) - (b.pathIndex ?? 0));
