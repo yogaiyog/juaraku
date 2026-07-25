@@ -186,6 +186,10 @@ export default function ProjectEditor() {
   const [waitingForInput, setWaitingForInput] = useState(false);
   const inputCallbackRef = useRef<((value: string) => void) | null>(null);
   const initTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const studentIdRef = useRef<string | null>(null);
+  const tokenRef = useRef<string | null>(null);
+  const fallbackUrlRef = useRef<string | null>(null);
+  const projectIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setDark(getInitialDark());
@@ -228,6 +232,17 @@ export default function ProjectEditor() {
       if (payload.defaultCode) setCode(payload.defaultCode);
       if (payload.title) setEditorTitle(payload.title);
       if (payload.taskCode) setTaskCode(payload.taskCode);
+      if (payload.studentId) studentIdRef.current = payload.studentId;
+      if (payload.token) tokenRef.current = payload.token;
+      if (payload.fallbackUrl) fallbackUrlRef.current = payload.fallbackUrl;
+      if (payload.projectId) projectIdRef.current = payload.projectId;
+
+      console.log("[ProjectEditor] Init received", {
+        taskCode: payload.taskCode,
+        studentId: payload.studentId,
+        hasFallbackUrl: !!payload.fallbackUrl,
+        hasToken: !!payload.token,
+      });
     };
 
     window.addEventListener("message", handleMessage);
@@ -247,30 +262,53 @@ export default function ProjectEditor() {
 
   const sendProgress = useCallback(
     (status: string) => {
-      if (!integrated || !window.opener) return;
-      window.opener.postMessage(
-        {
-          type: "python-editor:progress",
-          payload: { status, taskCode },
-        },
-        "*",
-      );
+      const payload = { taskCode, status, projectId: projectIdRef.current, studentId: studentIdRef.current };
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({ type: "python-editor:progress", payload }, "*");
+      }
     },
-    [integrated, taskCode],
+    [taskCode],
   );
 
-  const handleDone = useCallback(() => {
-    if (integrated && window.opener) {
-      window.opener.postMessage(
-        {
-          type: "python-editor:done",
-          payload: { status: "completed", taskCode },
-        },
-        "*",
-      );
+  const reportProgress = useCallback(async (taskId: string, status: string) => {
+    console.log("[ProjectEditor] reportProgress", { taskId, status, studentId: studentIdRef.current, hasOpener: !!window.opener, hasFallbackUrl: !!fallbackUrlRef.current });
+
+    const payload = { taskCode: taskId, status, projectId: projectIdRef.current, studentId: studentIdRef.current };
+
+    if (window.opener && !window.opener.closed) {
+      console.log("[ProjectEditor] Sending postMessage to opener");
+      window.opener.postMessage({ type: "python-editor:done", payload }, "*");
+      return;
     }
+
+    if (fallbackUrlRef.current) {
+      console.log("[ProjectEditor] Sending HTTP fallback to", fallbackUrlRef.current);
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (tokenRef.current) headers["Authorization"] = `Bearer ${tokenRef.current}`;
+      try {
+        const res = await fetch(fallbackUrlRef.current, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            studentId: studentIdRef.current,
+            topicTaskCode: taskId,
+            status,
+            metadata: JSON.stringify({ projectId: projectIdRef.current, source: "fallback" }),
+          }),
+        });
+        console.log("[ProjectEditor] Fallback response", res.status);
+      } catch (err) {
+        console.error("[ProjectEditor] Fallback error", err);
+      }
+    } else {
+      console.warn("[ProjectEditor] No opener and no fallbackUrl — progress not saved");
+    }
+  }, []);
+
+  const handleDone = useCallback(async () => {
+    if (taskCode) await reportProgress(taskCode, "completed");
     window.close();
-  }, [integrated, taskCode]);
+  }, [taskCode, reportProgress]);
 
   const toggleDark = useCallback(() => {
     setDark((v) => {
@@ -358,6 +396,8 @@ for _ in range(4):
     setShowTurtle(false);
   }, []);
 
+  const canSubmit = integrated || Boolean(fallbackUrlRef.current);
+
   if (!sk || !ready) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -402,11 +442,11 @@ for _ in range(4):
           <button
             onClick={handleDone}
             className={`rounded-lg px-5 py-2 text-sm font-medium text-white transition-colors ${
-              integrated
+              canSubmit
                 ? "bg-blue-600 hover:bg-blue-700"
                 : "bg-zinc-400 cursor-not-allowed"
             }`}
-            disabled={!integrated}
+            disabled={!canSubmit}
           >
             Selesai
           </button>
