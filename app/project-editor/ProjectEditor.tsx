@@ -46,6 +46,16 @@ const DEFAULT_CODE = `print("Hello from Skulpt!")
 
 for i in range(5):
     print("Number:", i)
+
+
+
+
+
+
+
+
+
+
 `;
 
 const DEFAULT_INSTRUCTIONS = `## Project Editor
@@ -229,7 +239,7 @@ export default function ProjectEditor() {
 
       setIntegrated(true);
       if (payload.instructions) setInstructions(payload.instructions);
-      if (payload.defaultCode) setCode(payload.defaultCode);
+      if (payload.defaultCode) setCode(payload.defaultCode + "\n".repeat(10));
       if (payload.title) setEditorTitle(payload.title);
       if (payload.taskCode) setTaskCode(payload.taskCode);
       if (payload.studentId) studentIdRef.current = payload.studentId;
@@ -382,20 +392,6 @@ export default function ProjectEditor() {
     [waitingForInput, handleInput],
   );
 
-  const loadTurtleExample = useCallback(() => {
-    setCode(`import turtle
-
-t = turtle.Turtle()
-t.speed(3)
-
-for _ in range(4):
-    t.forward(100)
-    t.right(90)
-`);
-    setOutput("");
-    setShowTurtle(false);
-  }, []);
-
   const canSubmit = integrated || Boolean(fallbackUrlRef.current);
 
   if (!sk || !ready) {
@@ -409,7 +405,7 @@ for _ in range(4):
   return (
     <div className="flex flex-1 flex-col gap-4 p-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">{editorTitle}</h2>
+        <h2 className="text-lg font-semibold">Activity {editorTitle}</h2>
         <div className="flex items-center gap-2">
           <button
             onClick={toggleDark}
@@ -422,16 +418,7 @@ for _ in range(4):
           >
             {dark ? "☀️" : "🌙"}
           </button>
-          <button
-            onClick={loadTurtleExample}
-            className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
-              dark
-                ? "border-zinc-700 text-zinc-400 hover:bg-zinc-800"
-                : "border-zinc-300 text-zinc-600 hover:bg-zinc-100"
-            }`}
-          >
-            Turtle Example
-          </button>
+
           <button
             onClick={runCode}
             disabled={running}
