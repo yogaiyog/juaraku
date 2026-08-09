@@ -14,7 +14,6 @@ type InitPayload = {
   defaultCode?: string;
   title?: string;
   studentId?: string;
-  token?: string;
   fallbackUrl?: string;
   taskCode?: string;
   projectId?: string;
@@ -190,6 +189,7 @@ export default function ProjectEditor() {
   const [taskCode, setTaskCode] = useState<string | null>(null);
   const [instructions, setInstructions] = useState(DEFAULT_INSTRUCTIONS);
   const [editorTitle, setEditorTitle] = useState("Project Editor");
+  const [doneMsg, setDoneMsg] = useState<string | null>(null);
   const outputRef = useRef<HTMLPreElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const turtleRef = useRef<HTMLDivElement>(null);
@@ -197,7 +197,6 @@ export default function ProjectEditor() {
   const inputCallbackRef = useRef<((value: string) => void) | null>(null);
   const initTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const studentIdRef = useRef<string | null>(null);
-  const tokenRef = useRef<string | null>(null);
   const fallbackUrlRef = useRef<string | null>(null);
   const projectIdRef = useRef<string | null>(null);
 
@@ -243,7 +242,6 @@ export default function ProjectEditor() {
       if (payload.title) setEditorTitle(payload.title);
       if (payload.taskCode) setTaskCode(payload.taskCode);
       if (payload.studentId) studentIdRef.current = payload.studentId;
-      if (payload.token) tokenRef.current = payload.token;
       if (payload.fallbackUrl) fallbackUrlRef.current = payload.fallbackUrl;
       if (payload.projectId) projectIdRef.current = payload.projectId;
 
@@ -251,7 +249,6 @@ export default function ProjectEditor() {
         taskCode: payload.taskCode,
         studentId: payload.studentId,
         hasFallbackUrl: !!payload.fallbackUrl,
-        hasToken: !!payload.token,
       });
     };
 
@@ -294,7 +291,6 @@ export default function ProjectEditor() {
     if (fallbackUrlRef.current) {
       console.log("[ProjectEditor] Sending HTTP fallback to", fallbackUrlRef.current);
       const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (tokenRef.current) headers["Authorization"] = `Bearer ${tokenRef.current}`;
       try {
         const res = await fetch(fallbackUrlRef.current, {
           method: "POST",
@@ -317,7 +313,13 @@ export default function ProjectEditor() {
 
   const handleDone = useCallback(async () => {
     if (taskCode) await reportProgress(taskCode, "completed");
-    window.close();
+    // Browsers only allow a script to close a window it opened itself.
+    // When opened directly (no opener), window.close() is rejected.
+    if (window.opener && !window.opener.closed) {
+      window.close();
+    } else {
+      setDoneMsg("Progress tersimpan. Kamu bisa menutup tab ini.");
+    }
   }, [taskCode, reportProgress]);
 
   const toggleDark = useCallback(() => {
@@ -355,7 +357,10 @@ export default function ProjectEditor() {
       return new Promise<string>((resolve) => {
         setOutput((prev) => prev + prompt);
         setWaitingForInput(true);
-        inputCallbackRef.current = resolve;
+        inputCallbackRef.current = (value: string) => {
+          setOutput((prev) => prev + value + "\n");
+          resolve(value);
+        };
       });
     };
 
@@ -404,6 +409,11 @@ export default function ProjectEditor() {
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4">
+      {doneMsg && (
+        <div className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-center text-sm font-semibold text-emerald-700">
+          ✓ {doneMsg}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Activity {editorTitle}</h2>
         <div className="flex items-center gap-2">
@@ -441,7 +451,7 @@ export default function ProjectEditor() {
       </div>
 
       <div className="flex flex-1 gap-4 max-sm:flex-col">
-        <div className="flex flex-2 flex-col">
+        <div className="flex flex-2 min-w-0 flex-col">
           <label className="mb-1 text-xs font-medium text-zinc-500 uppercase tracking-wide">
             Code
           </label>
@@ -476,14 +486,14 @@ export default function ProjectEditor() {
           </div>
         </div>
 
-        <div className="flex flex-1 flex-col gap-4">
+        <div className="flex flex-1 min-w-0 flex-col gap-4">
           <div className="flex flex-col flex-1">
             <label className="mb-1 text-xs font-medium text-zinc-500 uppercase tracking-wide">
               Output
             </label>
             <pre
               ref={outputRef}
-              className={`font-mono flex-1 overflow-auto rounded-lg border p-3 text-sm leading-relaxed shadow-sm ${
+              className={`font-mono flex-1 min-w-0 overflow-auto whitespace-pre-wrap break-words rounded-lg border p-3 text-sm leading-relaxed shadow-sm ${
                 dark
                   ? "border-zinc-700 bg-zinc-950 text-zinc-100"
                   : "border-zinc-300 bg-zinc-50 text-zinc-900"
@@ -514,7 +524,7 @@ export default function ProjectEditor() {
             id="turtle"
             className={`rounded-lg border bg-white shadow-sm ${
               dark ? "border-zinc-700" : "border-zinc-300"
-            } ${showTurtle ? "" : "hidden"}`}
+            } ${showTurtle ? "min-w-0 max-w-full overflow-hidden" : "hidden"}`}
             style={showTurtle ? { minHeight: 400 } : undefined}
           />
         </div>
