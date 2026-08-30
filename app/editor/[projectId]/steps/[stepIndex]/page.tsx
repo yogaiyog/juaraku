@@ -1,7 +1,17 @@
 "use client";
 
-import { useEffect, useState, use, useCallback } from "react";
+import { useEffect, useState, useRef, use, useCallback } from "react";
 import Link from "next/link";
+import EditorPreview from "@/app/_components/EditorPreview";
+
+type PreviewSegment =
+  | { type: "markdown"; html: string }
+  | { type: "task"; html: string }
+  | { type: "no-print"; html: string }
+  | { type: "print-only"; html: string }
+  | { type: "blocks3"; code: string }
+  | { type: "collapse"; title: string; html: string }
+  | { type: "save" };
 
 export default function EditStepPage({
   params,
@@ -16,8 +26,12 @@ export default function EditStepPage({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [content, setContent] = useState("");
-  const [preview, setPreview] = useState("");
+  const [segments, setSegments] = useState<PreviewSegment[]>([]);
   const [showPreview, setShowPreview] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     fetch(`/api/editor/projects/${projectId}/steps/${stepNum}`)
@@ -30,29 +44,60 @@ export default function EditStepPage({
       .finally(() => setLoading(false));
   }, [projectId, stepNum]);
 
-  const updatePreview = useCallback(async (md: string) => {
-    if (!md.trim()) {
-      setPreview("<p class='text-zinc-400 italic'>Empty content</p>");
-      return;
-    }
-    try {
-      const res = await fetch("/api/editor/preview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ markdown: md }),
-      });
-      const data = await res.json();
-      setPreview(data.html || "<p class='text-red-400'>Preview error</p>");
-    } catch {
-      setPreview("<p class='text-red-400'>Preview failed</p>");
-    }
-  }, []);
+  const fetchPreview = useCallback(
+    async (md: string) => {
+      if (!md.trim()) {
+        setSegments([]);
+        return;
+      }
+
+      // Cancel previous in-flight request
+      if (abortRef.current) {
+        abortRef.current.abort();
+      }
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      setPreviewLoading(true);
+      try {
+        const res = await fetch("/api/editor/preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ markdown: md, projectId }),
+          signal: controller.signal,
+        });
+        const data = await res.json();
+        setSegments(data.segments || []);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setSegments([]);
+      } finally {
+        setPreviewLoading(false);
+      }
+    },
+    [projectId]
+  );
+
+  // Live preview with debounce
+  useEffect(() => {
+    if (!showPreview) return;
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      fetchPreview(content);
+    }, 500);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [content, showPreview, fetchPreview]);
 
   function togglePreview() {
-    if (!showPreview) {
-      updatePreview(content);
+    const next = !showPreview;
+    setShowPreview(next);
+    if (next) {
+      fetchPreview(content);
     }
-    setShowPreview((p) => !p);
   }
 
   async function handleSave() {
@@ -79,6 +124,19 @@ export default function EditStepPage({
     setSaving(false);
   }
 
+  // Ctrl+S / Cmd+S keyboard shortcut
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        handleSave();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [content, projectId, stepNum]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -102,8 +160,9 @@ export default function EditStepPage({
   }
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <div className="mb-6 flex items-center justify-between">
+    <div className="mx-auto max-w-7xl">
+      {/* Header */}
+      <div className="mb-4 flex items-center justify-between">
         <div>
           <Link
             href={`/editor/${projectId}`}
@@ -121,7 +180,7 @@ export default function EditStepPage({
             onClick={togglePreview}
             className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
               showPreview
-                ? "bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200"
+                ? "bg-scratch-blue text-white"
                 : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
             }`}
           >
@@ -132,7 +191,7 @@ export default function EditStepPage({
             disabled={saving}
             className="rounded-lg bg-scratch-blue px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-scratch-purple disabled:opacity-50"
           >
-            {success ? "Saved!" : saving ? "Saving..." : "Save"}
+            {success ? "✓ Saved!" : saving ? "Saving..." : "Save"}
           </button>
         </div>
       </div>
@@ -143,36 +202,46 @@ export default function EditStepPage({
         </div>
       )}
 
+      {/* Editor + Preview */}
       <div
         className={`grid gap-4 ${
           showPreview ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1"
         }`}
       >
-        <div>
+        {/* Textarea */}
+        <div className="flex flex-col">
           <label className="mb-2 block text-sm font-medium text-zinc-600 dark:text-zinc-400">
             Markdown Content
           </label>
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            rows={30}
-            className="block w-full resize-y rounded-lg border border-zinc-300 bg-white px-4 py-3 font-mono text-sm text-zinc-900 leading-relaxed focus:border-scratch-blue focus:outline-none focus:ring-1 focus:ring-scratch-blue dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+            rows={35}
+            className="block w-full flex-1 resize-y rounded-lg border border-zinc-300 bg-white px-4 py-3 font-mono text-sm text-zinc-900 leading-relaxed focus:border-scratch-blue focus:outline-none focus:ring-1 focus:ring-scratch-blue dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
             placeholder="Write your step content in markdown..."
+            spellCheck={false}
           />
         </div>
 
+        {/* Preview */}
         {showPreview && (
-          <div>
-            <label className="mb-2 block text-sm font-medium text-zinc-600 dark:text-zinc-400">
+          <div className="flex flex-col">
+            <label className="mb-2 flex items-center gap-2 text-sm font-medium text-zinc-600 dark:text-zinc-400">
               Preview
+              {previewLoading && (
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-zinc-300 border-t-scratch-blue" />
+              )}
             </label>
-            <div className="prose prose-sm max-w-none rounded-lg border border-zinc-200/80 bg-white p-6 dark:border-zinc-800/80 dark:bg-zinc-950 dark:prose-invert h-[calc(30*1.625rem+1.5rem)] overflow-y-auto">
-              <div dangerouslySetInnerHTML={{ __html: preview }} />
+            <div className="flex-1 overflow-y-auto rounded-lg border border-zinc-200/80 bg-white p-6 dark:border-zinc-800/80 dark:bg-zinc-950"
+              style={{ maxHeight: "calc(35 * 1.625rem + 1.5rem)" }}
+            >
+              <EditorPreview segments={segments} projectId={projectId} />
             </div>
           </div>
         )}
       </div>
 
+      {/* Step Navigation */}
       <div className="mt-6 flex items-center gap-3">
         {stepNum > 1 && (
           <Link

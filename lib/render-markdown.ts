@@ -29,11 +29,16 @@ function preprocessWidth(content: string): string {
   );
 }
 
+function preprocessBold(content: string): string {
+  return content.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+}
+
 export function renderMarkdown(content: string): string {
   let cleaned = preprocessAnnotations(content);
   cleaned = preprocessTarget(cleaned);
   cleaned = preprocessBlock3(cleaned);
   cleaned = preprocessWidth(cleaned);
+  cleaned = preprocessBold(cleaned);
   const html = String(
     unified().use(remarkParse).use(remarkHtml, { sanitize: false }).processSync(cleaned)
   );

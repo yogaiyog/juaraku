@@ -13,7 +13,7 @@ import { uploadFile, getMimeType } from "../lib/minio";
 import { prisma } from "../lib/prisma";
 import type { ProjectMeta, StepEntry } from "../lib/types";
 
-const PROJECTS_DIR = path.join(process.cwd(), "projects");
+const PROJECTS_DIR = path.join(process.cwd(), "projects_backup_local");
 
 function parseProjectDir(dirName: string): {
   index: number;
