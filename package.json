@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1087.0",
+    "@codemirror/lang-markdown": "^6.5.2",
     "@codemirror/lang-python": "^6.2.1",
     "@prisma/client": "^6.19.3",
     "@prisma/pg-worker": "^6.9.0",

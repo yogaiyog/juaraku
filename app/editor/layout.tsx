@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Category, Path } from "@/lib/types";
 
 export default function EditorLayout({ children }: { children: React.ReactNode }) {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [paths, setPaths] = useState<Path[]>([]);
 
@@ -19,6 +20,22 @@ export default function EditorLayout({ children }: { children: React.ReactNode }
   const [editPathName, setEditPathName] = useState("");
   const [editPathDescription, setEditPathDescription] = useState("");
   const [pathError, setPathError] = useState<string | null>(null);
+
+  // Restore sidebar preference from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("editor-sidebar-open");
+    if (saved !== null) {
+      setSidebarOpen(saved === "true");
+    }
+  }, []);
+
+  function toggleSidebar() {
+    setSidebarOpen((prev) => {
+      const next = !prev;
+      localStorage.setItem("editor-sidebar-open", String(next));
+      return next;
+    });
+  }
 
   useEffect(() => {
     Promise.all([
@@ -180,145 +197,83 @@ export default function EditorLayout({ children }: { children: React.ReactNode }
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-3.5rem)]">
-      <aside className="hidden w-64 shrink-0 overflow-y-auto border-r border-zinc-200/80 bg-zinc-50/50 lg:block dark:border-zinc-800/80 dark:bg-zinc-950/50">
-        <nav className="sticky top-14 space-y-6 p-4">
-          {/* Navigation */}
-          <div>
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              Editor
-            </h2>
-            <ul className="space-y-1">
-              <li>
-                <Link
-                  href="/editor"
-                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-scratch-blue dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-scratch-blue"
-                >
-                  Projects
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/editor/new"
-                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-scratch-blue dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-scratch-blue"
-                >
-                  + New Project
-                </Link>
-              </li>
-            </ul>
-          </div>
+    <div className="relative flex min-h-[calc(100vh-3.5rem)]">
+      {/* Floating Icon-Only Toggle Button when sidebar is hidden */}
+      {!sidebarOpen && (
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          className="fixed left-2 top-16 z-40 flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-600 shadow-md hover:bg-zinc-100 hover:text-scratch-blue dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-all"
+          title="Show Sidebar"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      )}
 
-          {/* Categories */}
-          <div>
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              Categories ({categories.length})
-            </h2>
-            {categoryError && (
-              <div className="mb-2 rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] text-red-600 dark:border-red-800 dark:bg-red-950/20 dark:text-red-400">
-                {categoryError}
-              </div>
-            )}
-            <form onSubmit={handleAddCategory} className="mb-2 flex gap-1">
-              <input
-                type="text"
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                placeholder="New category..."
-                className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 placeholder-zinc-400 focus:border-scratch-blue focus:outline-none focus:ring-1 focus:ring-scratch-blue dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-              />
+      {/* Collapsible Sidebar */}
+      {sidebarOpen && (
+        <aside className="w-64 shrink-0 overflow-y-auto border-r border-zinc-200/80 bg-zinc-50/50 dark:border-zinc-800/80 dark:bg-zinc-950/50 transition-all">
+          <nav className="sticky top-14 space-y-5 p-3">
+            {/* Header with Icon-only Hide Button */}
+            <div className="flex items-center justify-between border-b border-zinc-200/70 pb-2 dark:border-zinc-800/70">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+                Menu & Settings
+              </span>
               <button
-                type="submit"
-                className="shrink-0 rounded bg-scratch-blue px-2 py-1 text-xs font-medium text-white hover:bg-scratch-purple"
+                type="button"
+                onClick={toggleSidebar}
+                className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 transition-colors"
+                title="Hide Sidebar"
               >
-                Add
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
               </button>
-            </form>
-            <ul className="max-h-48 space-y-0.5 overflow-y-auto">
-              {categories.map((cat) => (
-                <li
-                  key={cat.id}
-                  className="group flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                >
-                  {editingCategory?.id === cat.id ? (
-                    <>
-                      <input
-                        type="text"
-                        value={editCategoryName}
-                        onChange={(e) => setEditCategoryName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleUpdateCategory(cat.id);
-                          if (e.key === "Escape") {
-                            setEditingCategory(null);
-                            setEditCategoryName("");
-                          }
-                        }}
-                        autoFocus
-                        className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-xs text-zinc-900 focus:border-scratch-blue focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateCategory(cat.id)}
-                        className="shrink-0 text-[10px] font-medium text-scratch-blue hover:text-scratch-purple"
-                      >
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingCategory(null);
-                          setEditCategoryName("");
-                        }}
-                        className="shrink-0 text-[10px] text-zinc-400 hover:text-zinc-600"
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="min-w-0 flex-1 truncate text-zinc-700 dark:text-zinc-300">
-                        {cat.name}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingCategory(cat);
-                          setEditCategoryName(cat.name);
-                        }}
-                        className="shrink-0 rounded px-1 text-[10px] text-zinc-400 hover:text-scratch-blue opacity-0 group-hover:opacity-100"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteCategory(cat.id, cat.name)}
-                        className="shrink-0 rounded px-1 text-[10px] text-zinc-400 hover:text-red-500 opacity-0 group-hover:opacity-100"
-                      >
-                        Del
-                      </button>
-                    </>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
+            </div>
 
-          {/* Paths */}
-          <div>
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              Paths ({paths.length})
-            </h2>
-            {pathError && (
-              <div className="mb-2 rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] text-red-600 dark:border-red-800 dark:bg-red-950/20 dark:text-red-400">
-                {pathError}
-              </div>
-            )}
-            <form onSubmit={handleAddPath} className="mb-2 space-y-1">
-              <div className="flex gap-1">
+            {/* Navigation */}
+            <div>
+              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                Editor
+              </h2>
+              <ul className="space-y-1">
+                <li>
+                  <Link
+                    href="/editor"
+                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-scratch-blue dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-scratch-blue"
+                  >
+                    Projects
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/editor/new"
+                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-scratch-blue dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-scratch-blue"
+                  >
+                    + New Project
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Categories */}
+            <div>
+              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                Categories ({categories.length})
+              </h2>
+              {categoryError && (
+                <div className="mb-2 rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] text-red-600 dark:border-red-800 dark:bg-red-950/20 dark:text-red-400">
+                  {categoryError}
+                </div>
+              )}
+              <form onSubmit={handleAddCategory} className="mb-2 flex gap-1">
                 <input
                   type="text"
-                  value={newPathName}
-                  onChange={(e) => setNewPathName(e.target.value)}
-                  placeholder="New path..."
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="New category..."
                   className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 placeholder-zinc-400 focus:border-scratch-blue focus:outline-none focus:ring-1 focus:ring-scratch-blue dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
                 />
                 <button
@@ -327,85 +282,183 @@ export default function EditorLayout({ children }: { children: React.ReactNode }
                 >
                   Add
                 </button>
-              </div>
-              <input
-                type="text"
-                value={newPathDescription}
-                onChange={(e) => setNewPathDescription(e.target.value)}
-                placeholder="Description (optional)..."
-                className="w-full rounded border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 placeholder-zinc-400 focus:border-scratch-blue focus:outline-none focus:ring-1 focus:ring-scratch-blue dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-              />
-            </form>
-            <ul className="max-h-48 space-y-0.5 overflow-y-auto">
-              {paths.map((path) => (
-                <li
-                  key={path.id}
-                  className="group flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                >
-                  {editingPath?.id === path.id ? (
-                    <>
-                      <input
-                        type="text"
-                        value={editPathName}
-                        onChange={(e) => setEditPathName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleUpdatePath(path.id);
-                          if (e.key === "Escape") {
+              </form>
+              <ul className="max-h-48 space-y-0.5 overflow-y-auto">
+                {categories.map((cat) => (
+                  <li
+                    key={cat.id}
+                    className="group flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  >
+                    {editingCategory?.id === cat.id ? (
+                      <>
+                        <input
+                          type="text"
+                          value={editCategoryName}
+                          onChange={(e) => setEditCategoryName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleUpdateCategory(cat.id);
+                            if (e.key === "Escape") {
+                              setEditingCategory(null);
+                              setEditCategoryName("");
+                            }
+                          }}
+                          autoFocus
+                          className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-xs text-zinc-900 focus:border-scratch-blue focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateCategory(cat.id)}
+                          className="shrink-0 text-[10px] font-medium text-scratch-blue hover:text-scratch-purple"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingCategory(null);
+                            setEditCategoryName("");
+                          }}
+                          className="shrink-0 text-[10px] text-zinc-400 hover:text-zinc-600"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="min-w-0 flex-1 truncate text-zinc-700 dark:text-zinc-300">
+                          {cat.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingCategory(cat);
+                            setEditCategoryName(cat.name);
+                          }}
+                          className="shrink-0 rounded px-1 text-[10px] text-zinc-400 hover:text-scratch-blue opacity-0 group-hover:opacity-100"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                          className="shrink-0 rounded px-1 text-[10px] text-zinc-400 hover:text-red-500 opacity-0 group-hover:opacity-100"
+                        >
+                          Del
+                        </button>
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Paths */}
+            <div>
+              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                Paths ({paths.length})
+              </h2>
+              {pathError && (
+                <div className="mb-2 rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] text-red-600 dark:border-red-800 dark:bg-red-950/20 dark:text-red-400">
+                  {pathError}
+                </div>
+              )}
+              <form onSubmit={handleAddPath} className="mb-2 space-y-1">
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    value={newPathName}
+                    onChange={(e) => setNewPathName(e.target.value)}
+                    placeholder="New path..."
+                    className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 placeholder-zinc-400 focus:border-scratch-blue focus:outline-none focus:ring-1 focus:ring-scratch-blue dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                  />
+                  <button
+                    type="submit"
+                    className="shrink-0 rounded bg-scratch-blue px-2 py-1 text-xs font-medium text-white hover:bg-scratch-purple"
+                  >
+                    Add
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={newPathDescription}
+                  onChange={(e) => setNewPathDescription(e.target.value)}
+                  placeholder="Description (optional)..."
+                  className="w-full rounded border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 placeholder-zinc-400 focus:border-scratch-blue focus:outline-none focus:ring-1 focus:ring-scratch-blue dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                />
+              </form>
+              <ul className="max-h-48 space-y-0.5 overflow-y-auto">
+                {paths.map((path) => (
+                  <li
+                    key={path.id}
+                    className="group flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  >
+                    {editingPath?.id === path.id ? (
+                      <>
+                        <input
+                          type="text"
+                          value={editPathName}
+                          onChange={(e) => setEditPathName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleUpdatePath(path.id);
+                            if (e.key === "Escape") {
+                              setEditingPath(null);
+                              setEditPathName("");
+                              setEditPathDescription("");
+                            }
+                          }}
+                          autoFocus
+                          className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-xs text-zinc-900 focus:border-scratch-blue focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleUpdatePath(path.id)}
+                          className="shrink-0 text-[10px] font-medium text-scratch-blue hover:text-scratch-purple"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
                             setEditingPath(null);
                             setEditPathName("");
                             setEditPathDescription("");
-                          }
-                        }}
-                        autoFocus
-                        className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-xs text-zinc-900 focus:border-scratch-blue focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleUpdatePath(path.id)}
-                        className="shrink-0 text-[10px] font-medium text-scratch-blue hover:text-scratch-purple"
-                      >
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingPath(null);
-                          setEditPathName("");
-                          setEditPathDescription("");
-                        }}
-                        className="shrink-0 text-[10px] text-zinc-400 hover:text-zinc-600"
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="min-w-0 flex-1 truncate text-zinc-700 dark:text-zinc-300">
-                        {path.name}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => openPathEdit(path)}
-                        className="shrink-0 rounded px-1 text-[10px] text-zinc-400 hover:text-scratch-blue opacity-0 group-hover:opacity-100"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeletePath(path.id, path.name)}
-                        className="shrink-0 rounded px-1 text-[10px] text-zinc-400 hover:text-red-500 opacity-0 group-hover:opacity-100"
-                      >
-                        Del
-                      </button>
-                    </>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </nav>
-      </aside>
-      <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
+                          }}
+                          className="shrink-0 text-[10px] text-zinc-400 hover:text-zinc-600"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="min-w-0 flex-1 truncate text-zinc-700 dark:text-zinc-300">
+                          {path.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => openPathEdit(path)}
+                          className="shrink-0 rounded px-1 text-[10px] text-zinc-400 hover:text-scratch-blue opacity-0 group-hover:opacity-100"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePath(path.id, path.name)}
+                          className="shrink-0 rounded px-1 text-[10px] text-zinc-400 hover:text-red-500 opacity-0 group-hover:opacity-100"
+                        >
+                          Del
+                        </button>
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </nav>
+        </aside>
+      )}
+
+      {/* Main Content Area */}
+      <main className={`min-w-0 flex-1 p-2 sm:p-4 transition-all ${!sidebarOpen ? "pl-11 sm:pl-12" : ""}`}>
         {children}
       </main>
     </div>
