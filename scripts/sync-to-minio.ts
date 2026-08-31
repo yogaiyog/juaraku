@@ -9,7 +9,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { load } from "js-yaml";
-import { uploadFile, getMimeType } from "../lib/minio";
+import { uploadFile, listFiles, getMimeType } from "../lib/minio";
 import { prisma } from "../lib/prisma";
 import type { ProjectMeta, StepEntry } from "../lib/types";
 
@@ -39,7 +39,7 @@ function walkDir(dir: string, base: string = dir): string[] {
   return files;
 }
 
-export async function syncProject(dirName: string) {
+export async function syncProject(dirName: string, force: boolean = false) {
   const slug = parseProjectDir(dirName)?.name ?? dirName;
   const projectDir = path.join(PROJECTS_DIR, dirName);
   const minioPrefix = `projects/${dirName}`;
@@ -62,31 +62,54 @@ export async function syncProject(dirName: string) {
 
   console.log(`\n📦 Syncing: ${dirName} (slug: ${slug}, index: ${dirIndex})`);
 
-  // 1. Upload all files to MinIO
+  // 1. Upload files to MinIO (skip already uploaded files unless force is true)
   const files = walkDir(projectDir);
+  const existingKeys = force ? new Set<string>() : new Set(await listFiles(minioPrefix));
   let uploaded = 0;
+  let skipped = 0;
 
   for (const file of files) {
     const localPath = path.join(projectDir, file);
     const minioKey = `${minioPrefix}/${file}`;
+
+    if (!force && existingKeys.has(minioKey)) {
+      skipped++;
+      continue;
+    }
+
     const content = fs.readFileSync(localPath);
     const contentType = getMimeType(file);
 
     await uploadFile(minioKey, content, contentType);
     uploaded++;
-    process.stdout.write(`  ↑ Uploaded ${uploaded}/${files.length} files\r`);
+    process.stdout.write(`  ↑ Uploaded ${uploaded}/${files.length} (skipped: ${skipped})\r`);
   }
-  console.log(`  ✅ Uploaded ${uploaded} files to MinIO`);
+  console.log(`  ✅ MinIO: ${uploaded} uploaded, ${skipped} skipped (already exists)`);
 
-  // 2. Parse meta.yml
-  const metaPath = path.join(projectDir, "en", "meta.yml");
-  if (!fs.existsSync(metaPath)) {
-    console.log(`  ⚠️  No meta.yml found, skipping DB sync`);
+  // 2. Parse meta.yml (prefer id, fallback to en)
+  const lang = fs.existsSync(path.join(projectDir, "id", "meta.yml"))
+    ? "id"
+    : fs.existsSync(path.join(projectDir, "en", "meta.yml"))
+    ? "en"
+    : null;
+
+  if (!lang) {
+    console.log(`  ⚠️  No meta.yml found in id/ or en/, skipping DB sync`);
     return;
   }
 
+  const metaPath = path.join(projectDir, lang, "meta.yml");
+  console.log(`  📖 Reading metadata from: ${lang}/meta.yml`);
   const metaRaw = fs.readFileSync(metaPath, "utf-8");
   const meta = load(metaRaw) as ProjectMeta;
+
+  let parsedVersion: number | null = null;
+  if (typeof (meta as any).version === "number") {
+    parsedVersion = (meta as any).version;
+  } else if ((meta as any).version) {
+    const num = Number.parseInt(String((meta as any).version).split(".")[0], 10);
+    parsedVersion = Number.isNaN(num) ? null : num;
+  }
 
   // 3. Upsert project
   const projectData = {
@@ -102,7 +125,7 @@ export async function syncProject(dirName: string) {
     listed: meta.listed ?? true,
     copyedit: meta.copyedit ?? false,
     lastTested: meta.last_tested ? new Date(meta.last_tested) : null,
-    version: meta.version ?? null,
+    version: parsedVersion,
     updatedAt: new Date(),
   };
 
@@ -135,6 +158,16 @@ export async function syncProject(dirName: string) {
     const stepNumber = i + 1;
     const hasQuiz = !!step.knowledge_quiz;
 
+    const quizVersion = step.knowledge_quiz?.version
+      ? Number.parseInt(String(step.knowledge_quiz.version), 10) || null
+      : null;
+    const quizQuestions = step.knowledge_quiz?.questions
+      ? Number.parseInt(String(step.knowledge_quiz.questions), 10) || null
+      : null;
+    const quizPassingScore = step.knowledge_quiz?.passing_score
+      ? Number.parseInt(String(step.knowledge_quiz.passing_score), 10) || null
+      : null;
+
     await prisma.step.create({
       data: {
         projectId,
@@ -143,9 +176,9 @@ export async function syncProject(dirName: string) {
         completion: step.completion ?? undefined,
         hasQuiz,
         quizPath: step.knowledge_quiz?.path ?? null,
-        quizVersion: step.knowledge_quiz?.version ?? null,
-        quizQuestions: step.knowledge_quiz?.questions ?? null,
-        quizPassingScore: step.knowledge_quiz?.passing_score ?? null,
+        quizVersion,
+        quizQuestions,
+        quizPassingScore,
         isChallenge: (step as StepEntry & { challenge?: boolean }).challenge ?? false,
       },
     });
@@ -207,10 +240,12 @@ function resolveDirectories(filter?: string): string[] {
 }
 
 async function main() {
-  const filter = process.argv[2];
+  const args = process.argv.slice(2);
+  const force = args.includes("--force") || args.includes("-f") || args.includes("--overwrite");
+  const filter = args.find((a) => !a.startsWith("-"));
   const label = filter ? `"${filter}"` : "all";
 
-  console.log(`🚀 Starting sync to MinIO + DB (${label})\n`);
+  console.log(`🚀 Starting sync to MinIO + DB (${label})${force ? " [FORCE OVERWRITE]" : ""}\n`);
 
   if (!fs.existsSync(PROJECTS_DIR)) {
     console.error("❌ projects/ directory not found");
@@ -221,7 +256,7 @@ async function main() {
   console.log(`Found ${directories.length} project(s) to sync`);
 
   for (const dirName of directories) {
-    await syncProject(dirName);
+    await syncProject(dirName, force);
   }
 
   console.log("\n✅ Sync complete!");

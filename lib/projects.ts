@@ -98,50 +98,74 @@ export async function getProjectDir(projectId: string): Promise<string> {
   return project?.dirName ?? projectId;
 }
 
-export async function getAllProjects(): Promise<Project[]> {
-  return withCache("all-projects", async () => {
+export async function getAllProjects(locale: string = "id"): Promise<Project[]> {
+  return withCache(`all-projects-${locale}`, async () => {
     const projects = await prisma.project.findMany({
       include: {
-        steps: true,
+        steps: { orderBy: { stepNumber: "asc" } },
         categories: { include: { category: true } },
         paths: { include: { path: true }, orderBy: { pathIndex: "asc" } },
       },
       orderBy: { dirIndex: "asc" },
     });
 
-    return projects.map((row) => {
-      const categories: Category[] = row.categories.map((pc) => ({
-        id: pc.category.id,
-        name: pc.category.name,
-        slug: pc.category.slug,
-      }));
-      const paths: Path[] = row.paths.map((pp) => ({
-        id: pp.path.id,
-        name: pp.path.name,
-        slug: pp.path.slug,
-        description: pp.path.description,
-      }));
-      const meta = buildMeta(row.steps, row);
-      return {
-        id: row.slug,
-        meta,
-        stepCount: meta.steps.length,
-        directoryName: row.dirName,
-        categories,
-        paths,
-        pathIndex: undefined,
-        certificate: null,
-      };
-    });
+    return Promise.all(
+      projects.map(async (row) => {
+        const categories: Category[] = row.categories.map((pc) => ({
+          id: pc.category.id,
+          name: pc.category.name,
+          slug: pc.category.slug,
+        }));
+        const paths: Path[] = row.paths.map((pp) => ({
+          id: pp.path.id,
+          name: pp.path.name,
+          slug: pp.path.slug,
+          description: pp.path.description,
+        }));
+        let meta = buildMeta(row.steps, row);
+
+        if (locale === "en") {
+          try {
+            const { getFileText } = await import("./minio");
+            const { load } = await import("js-yaml");
+            const localizedRaw = await getFileText(`projects/${row.dirName}/en/meta.yml`);
+            if (localizedRaw) {
+              const parsed = load(localizedRaw) as ProjectMeta;
+              if (parsed && parsed.title) {
+                meta = {
+                  ...meta,
+                  title: parsed.title,
+                  description: parsed.description ?? meta.description,
+                  meta_title: parsed.meta_title ?? meta.meta_title,
+                  meta_description: parsed.meta_description ?? meta.meta_description,
+                  steps: parsed.steps && parsed.steps.length > 0 ? parsed.steps : meta.steps,
+                };
+              }
+            }
+          } catch {}
+        }
+
+        return {
+          id: row.slug,
+          meta,
+          stepCount: meta.steps.length,
+          directoryName: row.dirName,
+          categories,
+          paths,
+          pathIndex: undefined,
+          certificate: null,
+        };
+      })
+    );
   });
 }
 
-export async function getProject(id: string): Promise<Project | null> {
-  return withCache(`project-${id}`, async () => {
+export async function getProject(id: string, locale: string = "id"): Promise<Project | null> {
+  return withCache(`project-${id}-${locale}`, async () => {
     const row = await prisma.project.findUnique({
       where: { slug: id },
       include: {
-        steps: true,
+        steps: { orderBy: { stepNumber: "asc" } },
         categories: { include: { category: true } },
         paths: { include: { path: true }, orderBy: { pathIndex: "asc" } },
       },
@@ -160,7 +184,31 @@ export async function getProject(id: string): Promise<Project | null> {
       slug: pp.path.slug,
       description: pp.path.description,
     }));
-    const meta = buildMeta(row.steps, row);
+    let meta = buildMeta(row.steps, row);
+
+    try {
+      const { getFileText } = await import("./minio");
+      const { load } = await import("js-yaml");
+      let localizedRaw = await getFileText(`projects/${row.dirName}/${locale}/meta.yml`);
+      if (!localizedRaw) {
+        const fallback = locale === "id" ? "en" : "id";
+        localizedRaw = await getFileText(`projects/${row.dirName}/${fallback}/meta.yml`);
+      }
+      if (localizedRaw) {
+        const parsed = load(localizedRaw) as ProjectMeta;
+        if (parsed && parsed.title) {
+          meta = {
+            ...meta,
+            title: parsed.title,
+            description: parsed.description ?? meta.description,
+            meta_title: parsed.meta_title ?? meta.meta_title,
+            meta_description: parsed.meta_description ?? meta.meta_description,
+            steps: parsed.steps && parsed.steps.length > 0 ? parsed.steps : meta.steps,
+          };
+        }
+      }
+    } catch {}
+
     return {
       id: row.slug,
       meta,
@@ -179,24 +227,26 @@ export async function getProjectMeta(id: string): Promise<ProjectMeta | null> {
   return project?.meta ?? null;
 }
 
-export function getMinioKey(projectId: string, relativePath: string): string {
-  return `projects/${projectId}/en/${relativePath}`;
+export function getMinioKey(projectId: string, relativePath: string, lang = "id"): string {
+  return `projects/${projectId}/${lang}/${relativePath}`;
 }
 
 export async function resolveProjectAsset(
   projectId: string,
-  relativePath: string
+  relativePath: string,
+  lang = "id"
 ): Promise<string> {
   const dirName = await getProjectDir(projectId);
-  return `projects/${dirName}/en/${relativePath}`;
+  return `projects/${dirName}/${lang}/${relativePath}`;
 }
 
 export async function getStepPath(
   projectId: string,
-  stepIndex: number
+  stepIndex: number,
+  lang = "id"
 ): Promise<string> {
   const dirName = await getProjectDir(projectId);
-  return `projects/${dirName}/en/step_${stepIndex}.md`;
+  return `projects/${dirName}/${lang}/step_${stepIndex}.md`;
 }
 
 export async function getCategories(): Promise<Category[]> {

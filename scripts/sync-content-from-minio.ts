@@ -39,10 +39,15 @@ async function main() {
     const dirName = project.dirName;
     console.log(`  ${project.slug} (${dirName})`);
 
-    // Sync step content
+    // Sync step content (prefer id, fallback to en)
     for (const step of project.steps) {
-      const minioKey = `projects/${dirName}/en/step_${step.stepNumber}.md`;
-      const content = await getFileText(minioKey);
+      let minioKey = `projects/${dirName}/id/step_${step.stepNumber}.md`;
+      let content = await getFileText(minioKey);
+
+      if (content === null) {
+        minioKey = `projects/${dirName}/en/step_${step.stepNumber}.md`;
+        content = await getFileText(minioKey);
+      }
 
       if (content !== null) {
         await prisma.step.update({
@@ -50,7 +55,7 @@ async function main() {
           data: { content },
         });
         totalSteps++;
-        process.stdout.write(`    step ${step.stepNumber} ✓\n`);
+        process.stdout.write(`    step ${step.stepNumber} ✓ (${minioKey.includes("/id/") ? "id" : "en"})\n`);
       } else {
         stepErrors++;
         process.stdout.write(`    step ${step.stepNumber} ⚠️  not found in MinIO\n`);

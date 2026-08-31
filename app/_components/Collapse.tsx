@@ -5,7 +5,8 @@ import ScratchContent from "./ScratchContent";
 
 type Props = {
   title: string;
-  html: string;
+  html?: string;
+  children?: React.ReactNode;
 };
 
 const proseCompact =
@@ -14,7 +15,7 @@ const proseCompact =
   "prose-a:text-scratch-blue " +
   "prose-h2:text-xl prose-h2:font-extrabold prose-h2:mt-6 prose-h2:mb-3";
 
-export default function Collapse({ title, html }: Props) {
+export default function Collapse({ title, html, children }: Props) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -44,7 +45,7 @@ export default function Collapse({ title, html }: Props) {
       </button>
       {open && (
         <div className="border-t border-zinc-200 px-5 py-4 dark:border-zinc-700">
-          <ScratchContent className={proseCompact} html={html} />
+          {children ? children : html ? <ScratchContent className={proseCompact} html={html} /> : null}
         </div>
       )}
     </div>

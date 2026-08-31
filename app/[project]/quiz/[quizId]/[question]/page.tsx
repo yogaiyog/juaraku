@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { getFileText } from "@/lib/minio";
 import { getAllProjects, getProject, getProjectDir } from "@/lib/projects";
 import { parseQuiz, parseQuizIntro } from "@/lib/markdown";
@@ -46,7 +47,10 @@ function renderQuizHtml(text: string): string {
 
 export default async function QuizPage({ params }: Props) {
   const { project, quizId, question: questionStr } = await params;
-  const proj = await getProject(project);
+  const cookieStore = await cookies();
+  const locale = cookieStore.get("locale")?.value || "id";
+
+  const proj = await getProject(project, locale);
   if (!proj) notFound();
 
   const stepWithQuiz = proj.meta.steps.find(
@@ -69,8 +73,13 @@ export default async function QuizPage({ params }: Props) {
   let quizQuestions = parseQuiz("");
 
   for (let q = 1; q <= stepWithQuiz.knowledge_quiz.questions; q++) {
-    const minioKey = `projects/${dirName}/en/${quizId}/question_${q}.md`;
-    const raw = await getFileText(minioKey);
+    let minioKey = `projects/${dirName}/${locale}/${quizId}/question_${q}.md`;
+    let raw = await getFileText(minioKey);
+    if (!raw) {
+      const fallback = locale === "id" ? "en" : "id";
+      minioKey = `projects/${dirName}/${fallback}/${quizId}/question_${q}.md`;
+      raw = await getFileText(minioKey);
+    }
     if (!raw) continue;
 
     if (q === questionIdx) {

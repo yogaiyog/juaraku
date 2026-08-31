@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { getFileText } from "@/lib/minio";
 import { getAllProjects, getProject, getProjectDir } from "@/lib/projects";
 import { getStepContent, parseQuiz, parseQuizIntro } from "@/lib/markdown";
@@ -28,7 +29,9 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { project, step } = await params;
-  const proj = await getProject(project);
+  const cookieStore = await cookies();
+  const locale = cookieStore.get("locale")?.value || "id";
+  const proj = await getProject(project, locale);
   if (!proj) return { title: "Not Found" };
   const stepIdx = Number.parseInt(step, 10);
   const stepMeta = proj.meta.steps[stepIdx - 1];
@@ -39,7 +42,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function StepPage({ params }: Props) {
   const { project, step } = await params;
-  const proj = await getProject(project);
+  const cookieStore = await cookies();
+  const locale = cookieStore.get("locale")?.value || "id";
+
+  const proj = await getProject(project, locale);
   if (!proj) notFound();
 
   const stepIdx = Number.parseInt(step, 10);
@@ -48,7 +54,7 @@ export default async function StepPage({ params }: Props) {
   }
 
   const stepMeta = proj.meta.steps[stepIdx - 1];
-  const segments = await getStepContent(project, stepIdx);
+  const segments = await getStepContent(project, stepIdx, locale);
 
   let quizIntro = "";
   const quizQuestions: ReturnType<typeof parseQuiz> = [];
@@ -57,8 +63,13 @@ export default async function StepPage({ params }: Props) {
     const dirName = await getProjectDir(project);
 
     for (let q = 1; q <= stepMeta.knowledge_quiz.questions; q++) {
-      const minioKey = `projects/${dirName}/en/${stepMeta.knowledge_quiz.path}/question_${q}.md`;
-      const raw = await getFileText(minioKey);
+      let minioKey = `projects/${dirName}/${locale}/${stepMeta.knowledge_quiz.path}/question_${q}.md`;
+      let raw = await getFileText(minioKey);
+      if (!raw) {
+        const fallback = locale === "id" ? "en" : "id";
+        minioKey = `projects/${dirName}/${fallback}/${stepMeta.knowledge_quiz.path}/question_${q}.md`;
+        raw = await getFileText(minioKey);
+      }
       if (!raw) continue;
 
       if (q === 1) {

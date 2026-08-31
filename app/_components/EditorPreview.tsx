@@ -9,11 +9,11 @@ import { applyTransforms } from "@/lib/transform-images";
 
 type PreviewSegment =
   | { type: "markdown"; html: string }
-  | { type: "task"; html: string }
+  | { type: "task"; html?: string; segments?: PreviewSegment[] }
   | { type: "no-print"; html: string }
   | { type: "print-only"; html: string }
   | { type: "blocks3"; code: string }
-  | { type: "collapse"; title: string; html: string }
+  | { type: "collapse"; title: string; html?: string; segments?: PreviewSegment[] }
   | { type: "save" };
 
 type Props = {
@@ -41,6 +41,77 @@ function transformHtml(html: string, projectId: string): string {
   return applyTransforms(html, projectId);
 }
 
+function renderSegmentItem(seg: PreviewSegment, i: number, projectId: string) {
+  switch (seg.type) {
+    case "markdown":
+      return (
+        <ScratchContent
+          key={i}
+          className={proseClasses}
+          html={transformHtml(seg.html, projectId)}
+        />
+      );
+    case "task":
+      return (
+        <TaskBlock key={i}>
+          {seg.segments && seg.segments.length > 0 ? (
+            <div className="space-y-4">
+              {seg.segments.map((sub, j) => renderSegmentItem(sub, j, projectId))}
+            </div>
+          ) : (
+            <ScratchContent
+              className={proseCompact}
+              html={transformHtml(seg.html || "", projectId)}
+            />
+          )}
+        </TaskBlock>
+      );
+    case "no-print":
+      return (
+        <ScratchContent
+          key={i}
+          className={proseClasses}
+          html={transformHtml(seg.html, projectId)}
+        />
+      );
+    case "print-only":
+      return (
+        <div
+          key={i}
+          className="my-4 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 p-4 dark:border-zinc-600 dark:bg-zinc-900/30"
+        >
+          <p className="mb-2 text-xs font-medium uppercase tracking-wider text-zinc-400">
+            🖨️ Print only
+          </p>
+          <ScratchContent
+            className={proseCompact}
+            html={transformHtml(seg.html, projectId)}
+          />
+        </div>
+      );
+    case "blocks3":
+      return <Blocks3Renderer key={i} code={seg.code} />;
+    case "collapse":
+      return (
+        <Collapse
+          key={i}
+          title={seg.title}
+          html={seg.html ? transformHtml(seg.html, projectId) : undefined}
+        >
+          {seg.segments && seg.segments.length > 0 ? (
+            <div className="space-y-4">
+              {seg.segments.map((sub, j) => renderSegmentItem(sub, j, projectId))}
+            </div>
+          ) : null}
+        </Collapse>
+      );
+    case "save":
+      return <SavePanel key={i} />;
+    default:
+      return null;
+  }
+}
+
 export default function EditorPreview({ segments, projectId }: Props) {
   if (segments.length === 0) {
     return (
@@ -52,64 +123,7 @@ export default function EditorPreview({ segments, projectId }: Props) {
 
   return (
     <div>
-      {segments.map((seg, i) => {
-        switch (seg.type) {
-          case "markdown":
-            return (
-              <ScratchContent
-                key={i}
-                className={proseClasses}
-                html={transformHtml(seg.html, projectId)}
-              />
-            );
-          case "task":
-            return (
-              <TaskBlock key={i}>
-                <ScratchContent
-                  className={proseCompact}
-                  html={transformHtml(seg.html, projectId)}
-                />
-              </TaskBlock>
-            );
-          case "no-print":
-            return (
-              <ScratchContent
-                key={i}
-                className={proseClasses}
-                html={transformHtml(seg.html, projectId)}
-              />
-            );
-          case "print-only":
-            return (
-              <div
-                key={i}
-                className="my-4 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 p-4 dark:border-zinc-600 dark:bg-zinc-900/30"
-              >
-                <p className="mb-2 text-xs font-medium uppercase tracking-wider text-zinc-400">
-                  🖨️ Print only
-                </p>
-                <ScratchContent
-                  className={proseCompact}
-                  html={transformHtml(seg.html, projectId)}
-                />
-              </div>
-            );
-          case "blocks3":
-            return <Blocks3Renderer key={i} code={seg.code} />;
-          case "collapse":
-            return (
-              <Collapse
-                key={i}
-                title={seg.title}
-                html={transformHtml(seg.html, projectId)}
-              />
-            );
-          case "save":
-            return <SavePanel key={i} />;
-          default:
-            return null;
-        }
-      })}
+      {segments.map((seg, i) => renderSegmentItem(seg, i, projectId))}
     </div>
   );
 }

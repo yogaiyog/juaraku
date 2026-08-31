@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import type { Metadata } from "next";
 import { getAllProjects, getCategories, getProjectsByCategory, getPaths } from "@/lib/projects";
 import Container from "./_components/Container";
@@ -18,13 +19,15 @@ type Props = {
 
 export default async function HomePage({ searchParams }: Props) {
   const sp = await searchParams;
+  const cookieStore = await cookies();
+  const locale = cookieStore.get("locale")?.value || "id";
   const categorySlug = sp.category;
 
   const [allCategories, paths] = await Promise.all([getCategories(), getPaths()]);
 
   const projects = categorySlug
     ? await getProjectsByCategory(categorySlug)
-    : await getAllProjects();
+    : await getAllProjects(locale);
 
   const page = Math.max(Number.parseInt(sp.page ?? "1", 10) || 1, 1);
   const totalPages = Math.max(Math.ceil(projects.length / PER_PAGE), 1);

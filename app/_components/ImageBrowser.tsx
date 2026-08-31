@@ -16,7 +16,10 @@ type Props = {
   isOpen: boolean;
   onClose: () => void;
   projectId: string;
-  onInsertImage: (markdownSyntax: string) => void;
+  onInsertImage?: (markdownSyntax: string) => void;
+  onSelectRawPath?: (filePath: string) => void;
+  title?: string;
+  selectButtonText?: string;
 };
 
 export default function ImageBrowser({
@@ -24,6 +27,9 @@ export default function ImageBrowser({
   onClose,
   projectId,
   onInsertImage,
+  onSelectRawPath,
+  title,
+  selectButtonText,
 }: Props) {
   const [assets, setAssets] = useState<ProjectAsset[]>([]);
   const [loading, setLoading] = useState(false);
@@ -148,8 +154,14 @@ export default function ImageBrowser({
   }
 
   function handleInsert() {
+    if (!selectedAsset) return;
+    if (onSelectRawPath) {
+      onSelectRawPath(selectedAsset.filePath);
+      onClose();
+      return;
+    }
     const markdown = generateMarkdown();
-    if (markdown) {
+    if (markdown && onInsertImage) {
       onInsertImage(markdown);
       onClose();
     }
@@ -168,7 +180,7 @@ export default function ImageBrowser({
         <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
           <div>
             <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-              <span>🖼️</span> Project Assets & Images
+              <span>🖼️</span> {title || "Project Assets & Images"}
             </h2>
             <p className="text-xs text-zinc-500">
               Upload images to MinIO or select existing assets for project:{" "}
@@ -327,82 +339,87 @@ export default function ImageBrowser({
                   />
                 </div>
 
-                {/* Alt Text */}
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                    Alt Text / Caption
-                  </label>
-                  <input
-                    type="text"
-                    value={altText}
-                    onChange={(e) => setAltText(e.target.value)}
-                    placeholder="Describe image..."
-                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-900 focus:border-scratch-blue focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-                  />
-                </div>
-
-                {/* Width Picker */}
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                    Image Display Width
-                  </label>
-                  <div className="grid grid-cols-3 gap-1.5 mb-2">
-                    {[
-                      { label: "250px", val: "250px" },
-                      { label: "300px", val: "300px" },
-                      { label: "400px", val: "400px" },
-                      { label: "500px", val: "500px" },
-                      { label: "100%", val: "100%" },
-                      { label: "None", val: "" },
-                    ].map((opt) => (
-                      <button
-                        key={opt.label}
-                        type="button"
-                        onClick={() => setWidthOption(opt.val)}
-                        className={`rounded-md px-2 py-1 text-xs font-medium border transition-colors ${
-                          widthOption === opt.val
-                            ? "bg-scratch-blue text-white border-scratch-blue"
-                            : "bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-100 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setWidthOption("custom")}
-                      className={`text-xs font-medium px-2 py-1 rounded border ${
-                        widthOption === "custom"
-                          ? "bg-scratch-blue text-white border-scratch-blue"
-                          : "bg-white text-zinc-700 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700"
-                      }`}
-                    >
-                      Custom Width
-                    </button>
-                    {widthOption === "custom" && (
+                {/* Options if inserting markdown */}
+                {!onSelectRawPath && (
+                  <>
+                    {/* Alt Text */}
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        Alt Text / Caption
+                      </label>
                       <input
                         type="text"
-                        value={customWidth}
-                        onChange={(e) => setCustomWidth(e.target.value)}
-                        placeholder="e.g. 350px or 80%"
-                        className="flex-1 rounded-lg border border-zinc-300 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                        value={altText}
+                        onChange={(e) => setAltText(e.target.value)}
+                        placeholder="Describe image..."
+                        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs text-zinc-900 focus:border-scratch-blue focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
                       />
-                    )}
-                  </div>
-                </div>
+                    </div>
 
-                {/* Generated Markdown Syntax Preview */}
-                <div>
-                  <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-zinc-400">
-                    Markdown Syntax
-                  </label>
-                  <div className="rounded-lg bg-zinc-900 p-2.5 font-mono text-[11px] text-zinc-200 overflow-x-auto break-all border border-zinc-800">
-                    {generateMarkdown()}
-                  </div>
-                </div>
+                    {/* Width Picker */}
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        Image Display Width
+                      </label>
+                      <div className="grid grid-cols-3 gap-1.5 mb-2">
+                        {[
+                          { label: "250px", val: "250px" },
+                          { label: "300px", val: "300px" },
+                          { label: "400px", val: "400px" },
+                          { label: "500px", val: "500px" },
+                          { label: "100%", val: "100%" },
+                          { label: "None", val: "" },
+                        ].map((opt) => (
+                          <button
+                            key={opt.label}
+                            type="button"
+                            onClick={() => setWidthOption(opt.val)}
+                            className={`rounded-md px-2 py-1 text-xs font-medium border transition-colors ${
+                              widthOption === opt.val
+                                ? "bg-scratch-blue text-white border-scratch-blue"
+                                : "bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-100 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700"
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setWidthOption("custom")}
+                          className={`text-xs font-medium px-2 py-1 rounded border ${
+                            widthOption === "custom"
+                              ? "bg-scratch-blue text-white border-scratch-blue"
+                              : "bg-white text-zinc-700 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700"
+                          }`}
+                        >
+                          Custom Width
+                        </button>
+                        {widthOption === "custom" && (
+                          <input
+                            type="text"
+                            value={customWidth}
+                            onChange={(e) => setCustomWidth(e.target.value)}
+                            placeholder="e.g. 350px or 80%"
+                            className="flex-1 rounded-lg border border-zinc-300 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Generated Markdown Syntax Preview */}
+                    <div>
+                      <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+                        Markdown Syntax
+                      </label>
+                      <div className="rounded-lg bg-zinc-900 p-2.5 font-mono text-[11px] text-zinc-200 overflow-x-auto break-all border border-zinc-800">
+                        {generateMarkdown()}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             ) : (
               <div className="flex h-full flex-col items-center justify-center text-center">
@@ -428,7 +445,7 @@ export default function ImageBrowser({
                 disabled={!selectedAsset}
                 className="rounded-lg bg-scratch-blue px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-scratch-purple transition-colors disabled:opacity-50"
               >
-                Insert into Step
+                {selectButtonText || (onSelectRawPath ? "Select Image" : "Insert into Step")}
               </button>
             </div>
           </div>

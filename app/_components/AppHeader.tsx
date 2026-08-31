@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import AuthHeader from "./auth-header";
+import LanguageSwitcher from "./LanguageSwitcher";
 
 export default function AppHeader() {
   const pathname = usePathname();
@@ -28,6 +29,7 @@ export default function AppHeader() {
         {!isProjectEditor && (
           <>
             <div className="flex-1" />
+            <LanguageSwitcher />
             <AuthHeader />
           </>
         )}

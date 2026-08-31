@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
+import ImageBrowser from "@/app/_components/ImageBrowser";
 import type { ProjectMeta, StepEntry } from "@/lib/types";
 
 export default function EditProjectPage({
@@ -14,6 +15,7 @@ export default function EditProjectPage({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [imageBrowserOpen, setImageBrowserOpen] = useState(false);
 
   const [meta, setMeta] = useState<ProjectMeta | null>(null);
 
@@ -159,16 +161,64 @@ export default function EditProjectPage({
                 className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-scratch-blue focus:outline-none focus:ring-1 focus:ring-scratch-blue dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Hero Image
-              </label>
-              <input
-                type="text"
-                value={meta.hero_image}
-                onChange={(e) => updateField("hero_image", e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-scratch-blue focus:outline-none focus:ring-1 focus:ring-scratch-blue dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-              />
+            <div className="sm:col-span-2 rounded-xl border border-zinc-200 bg-zinc-50/50 p-5 dark:border-zinc-800 dark:bg-zinc-900/50">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div>
+                  <label className="block text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                    <span>🖼️</span>
+                    <span>Gambar Card Proyek & Banner Utama (Hero Image)</span>
+                  </label>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Gambar ini adalah thumbnail utama yang tampil di <strong>kartu proyek halaman depan (<code>/</code>)</strong> dan <strong>banner atas modul proyek (<code>/[project]</code>)</strong>.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setImageBrowserOpen(true)}
+                  className="flex items-center gap-1.5 rounded-lg bg-scratch-blue px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-600 transition-colors cursor-pointer"
+                >
+                  <span>🖼️</span>
+                  <span>Pilih dari Asset / Upload Baru</span>
+                </button>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-start gap-4">
+                {/* Hero / Card Thumbnail Live Preview */}
+                <div className="relative aspect-video w-52 shrink-0 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 flex items-center justify-center shadow-xs">
+                  {meta.hero_image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={`/api/assets/${projectId}/${meta.hero_image}`}
+                      alt={meta.title}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' fill='none'%3E%3Crect width='100' height='100' fill='%23e4e4e7'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23a1a1aa' font-size='12'%3ENo Image%3C/text%3E%3C/svg%3E";
+                      }}
+                    />
+                  ) : (
+                    <span className="text-xs text-zinc-400">Belum ada gambar</span>
+                  )}
+                  <span className="absolute bottom-1.5 left-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold text-white">
+                    Preview Card
+                  </span>
+                </div>
+
+                <div className="flex-1 w-full">
+                  <label className="block text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-1">
+                    Path Berkas Gambar:
+                  </label>
+                  <input
+                    type="text"
+                    value={meta.hero_image}
+                    onChange={(e) => updateField("hero_image", e.target.value)}
+                    placeholder="images/banner.png"
+                    className="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-mono text-zinc-900 focus:border-scratch-blue focus:outline-none focus:ring-1 focus:ring-scratch-blue dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                  />
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                    <span>💡 Tips: Klik tombol <strong>Pilih dari Asset / Upload Baru</strong> di atas untuk memilih gambar dari galeri proyek atau mengunggah foto baru dari komputer.</span>
+                  </div>
+                </div>
+              </div>
             </div>
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -303,6 +353,19 @@ export default function EditProjectPage({
           </div>
         </section>
       </div>
+
+      {/* Image Browser Modal for Hero Image */}
+      <ImageBrowser
+        isOpen={imageBrowserOpen}
+        onClose={() => setImageBrowserOpen(false)}
+        projectId={projectId}
+        onSelectRawPath={(filePath) => {
+          updateField("hero_image", filePath);
+          setImageBrowserOpen(false);
+        }}
+        title="Pilih Hero Image Proyek"
+        selectButtonText="Gunakan sebagai Hero Image"
+      />
     </div>
   );
 }

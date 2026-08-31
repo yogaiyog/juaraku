@@ -36,12 +36,16 @@ export async function POST(
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // MinIO storage key
-    const minioKey = `projects/${project.dirName}/en/images/${sanitizedFileName}`;
+    // MinIO storage keys (upload to both id and en to support all locales)
+    const minioKeyId = `projects/${project.dirName}/id/images/${sanitizedFileName}`;
+    const minioKeyEn = `projects/${project.dirName}/en/images/${sanitizedFileName}`;
     const filePath = `images/${sanitizedFileName}`;
 
     // Upload to MinIO
-    await uploadFile(minioKey, buffer, mimeType);
+    await Promise.all([
+      uploadFile(minioKeyId, buffer, mimeType),
+      uploadFile(minioKeyEn, buffer, mimeType),
+    ]);
 
     // Save asset record in database
     const asset = await prisma.asset.upsert({
@@ -55,7 +59,7 @@ export async function POST(
         fileName: sanitizedFileName,
         mimeType,
         size: BigInt(file.size),
-        minioKey,
+        minioKey: minioKeyId,
       },
       create: {
         projectId: project.id,
@@ -63,7 +67,7 @@ export async function POST(
         fileName: sanitizedFileName,
         mimeType,
         size: BigInt(file.size),
-        minioKey,
+        minioKey: minioKeyId,
       },
     });
 

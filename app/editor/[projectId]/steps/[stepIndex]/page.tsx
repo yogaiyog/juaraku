@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, use, useCallback, useMemo, DragEvent } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import CodeMirror, { ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { markdown } from "@codemirror/lang-markdown";
 import { EditorView, keymap } from "@codemirror/view";
@@ -11,11 +11,11 @@ import ImageBrowser from "@/app/_components/ImageBrowser";
 
 type PreviewSegment =
   | { type: "markdown"; html: string }
-  | { type: "task"; html: string }
+  | { type: "task"; html?: string; segments?: PreviewSegment[] }
   | { type: "no-print"; html: string }
   | { type: "print-only"; html: string }
   | { type: "blocks3"; code: string }
-  | { type: "collapse"; title: string; html: string }
+  | { type: "collapse"; title: string; html?: string; segments?: PreviewSegment[] }
   | { type: "save" };
 
 export default function EditStepPage({
@@ -25,12 +25,22 @@ export default function EditStepPage({
 }) {
   const { projectId, stepIndex } = use(params);
   const stepNum = Number.parseInt(stepIndex, 10);
+  const router = useRouter();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // Content & Dirty tracking states
   const [content, setContent] = useState("");
+  const [savedContent, setSavedContent] = useState("");
+  const [totalSteps, setTotalSteps] = useState<number>(0);
+
+  // Navigation confirmation modal states
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+  const [pendingNavigationUrl, setPendingNavigationUrl] = useState<string | null>(null);
+
   const [segments, setSegments] = useState<PreviewSegment[]>([]);
   const [showPreview, setShowPreview] = useState(true);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -45,6 +55,8 @@ export default function EditStepPage({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  const isDirty = content !== savedContent;
+
   // Detect dark mode from document or media query
   useEffect(() => {
     const isDark =
@@ -53,6 +65,7 @@ export default function EditStepPage({
     setIsDarkMode(isDark);
   }, []);
 
+  // Fetch Step Content
   useEffect(() => {
     fetch(`/api/editor/projects/${projectId}/steps/${stepNum}`)
       .then((r) => {
@@ -60,14 +73,40 @@ export default function EditStepPage({
         return r.json();
       })
       .then((data) => {
-        setContent(data.content || "");
-        if (data.content) {
-          fetchPreview(data.content);
+        const text = data.content || "";
+        setContent(text);
+        setSavedContent(text);
+        if (text) {
+          fetchPreview(text);
         }
       })
       .catch(() => setError("Step not found"))
       .finally(() => setLoading(false));
   }, [projectId, stepNum]);
+
+  // Fetch Total Steps Count
+  useEffect(() => {
+    fetch(`/api/editor/projects/${projectId}/steps`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.steps && Array.isArray(data.steps)) {
+          setTotalSteps(data.steps.length);
+        }
+      })
+      .catch(() => {});
+  }, [projectId]);
+
+  // Prevent accidental browser reload / tab close when dirty
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
 
   const fetchPreview = useCallback(
     async (md: string) => {
@@ -213,28 +252,68 @@ export default function EditStepPage({
     }
   }
 
-  async function handleSave() {
+  // Core Save function returning boolean success
+  async function handleSave(): Promise<boolean> {
     setError(null);
     setSaving(true);
 
-    const res = await fetch(
-      `/api/editor/projects/${projectId}/steps/${stepNum}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+    try {
+      const res = await fetch(
+        `/api/editor/projects/${projectId}/steps/${stepNum}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content }),
+        }
+      );
+
+      if (res.ok) {
+        setSavedContent(content);
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 3000);
+        setSaving(false);
+        return true;
+      } else {
+        const data = await res.json();
+        setError(data.error || "Failed to save");
+        setSaving(false);
+        return false;
       }
-    );
-
-    if (res.ok) {
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-    } else {
-      const data = await res.json();
-      setError(data.error || "Failed to save");
+    } catch {
+      setError("Failed to save step");
+      setSaving(false);
+      return false;
     }
+  }
 
-    setSaving(false);
+  // Navigation with Unsaved Check
+  function handleNavigate(url: string) {
+    if (isDirty) {
+      setPendingNavigationUrl(url);
+      setShowUnsavedModal(true);
+    } else {
+      router.push(url);
+    }
+  }
+
+  async function handleSaveAndNavigate() {
+    const ok = await handleSave();
+    if (ok && pendingNavigationUrl) {
+      setShowUnsavedModal(false);
+      router.push(pendingNavigationUrl);
+    }
+  }
+
+  function handleDiscardAndNavigate() {
+    setShowUnsavedModal(false);
+    if (pendingNavigationUrl) {
+      router.push(pendingNavigationUrl);
+    }
+  }
+
+  function handleCancelNavigate() {
+    setShowUnsavedModal(false);
+    setPendingNavigationUrl(null);
   }
 
   // CodeMirror Extensions & Shortcuts
@@ -310,12 +389,12 @@ export default function EditStepPage({
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <p className="text-red-500">{error}</p>
-        <Link
-          href={`/editor/${projectId}`}
-          className="mt-4 text-sm font-medium text-scratch-blue hover:text-scratch-purple"
+        <button
+          onClick={() => handleNavigate(`/editor/${projectId}`)}
+          className="mt-4 text-sm font-medium text-scratch-blue hover:text-scratch-purple cursor-pointer"
         >
           &larr; Back to Project
-        </Link>
+        </button>
       </div>
     );
   }
@@ -325,17 +404,24 @@ export default function EditStepPage({
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <Link
-            href={`/editor/${projectId}`}
-            className="mb-2 inline-block text-xs text-scratch-blue hover:text-scratch-purple"
+          <button
+            type="button"
+            onClick={() => handleNavigate(`/editor/${projectId}`)}
+            className="mb-2 inline-block text-xs font-semibold text-scratch-blue hover:text-scratch-purple cursor-pointer transition-colors"
           >
             &larr; Back to Project
-          </Link>
-          <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+          </button>
+          <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2.5">
             <span>Edit Step {stepNum}</span>
             <span className="rounded bg-scratch-blue/10 px-2 py-0.5 text-xs font-semibold text-scratch-blue">
               CodeMirror Pro Editor
             </span>
+            {isDirty && (
+              <span className="flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-bold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 animate-in fade-in">
+                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                Belum Disimpan
+              </span>
+            )}
           </h1>
         </div>
         <div className="flex items-center gap-2">
@@ -351,9 +437,13 @@ export default function EditStepPage({
             {showPreview ? "Hide Preview" : "Show Preview"}
           </button>
           <button
-            onClick={handleSave}
+            onClick={() => handleSave()}
             disabled={saving}
-            className="rounded-lg bg-scratch-blue px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-scratch-purple disabled:opacity-50"
+            className={`rounded-lg px-5 py-2 text-sm font-semibold text-white transition-all shadow-xs cursor-pointer ${
+              isDirty
+                ? "bg-scratch-blue hover:bg-blue-600 ring-2 ring-scratch-blue/30"
+                : "bg-scratch-blue/90 hover:bg-scratch-blue"
+            } disabled:opacity-50`}
           >
             {success ? "✓ Saved!" : saving ? "Saving..." : "Save (⌘+S)"}
           </button>
@@ -468,22 +558,41 @@ export default function EditStepPage({
         )}
       </div>
 
-      {/* Step Navigation */}
-      <div className="mt-6 flex items-center gap-3">
-        {stepNum > 1 && (
-          <Link
-            href={`/editor/${projectId}/steps/${stepNum - 1}`}
-            className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900"
-          >
-            &larr; Previous Step
-          </Link>
-        )}
-        <Link
-          href={`/editor/${projectId}/steps/${stepNum + 1}`}
-          className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-900"
-        >
-          Next Step &rarr;
-        </Link>
+      {/* Step Navigation Bar */}
+      <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-5 dark:border-zinc-800">
+        <div>
+          {stepNum > 1 && (
+            <button
+              type="button"
+              onClick={() => handleNavigate(`/editor/${projectId}/steps/${stepNum - 1}`)}
+              className="flex items-center gap-1.5 rounded-xl border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 cursor-pointer"
+            >
+              &larr; Previous Step ({stepNum - 1})
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          {totalSteps > 0 && stepNum >= totalSteps ? (
+            <button
+              type="button"
+              onClick={() => handleNavigate(`/editor/${projectId}`)}
+              className="flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-5 py-2 text-sm font-bold text-emerald-800 transition-all hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 cursor-pointer shadow-xs"
+            >
+              <span>✓ Selesai Semua Langkah</span>
+              <span className="text-xs font-normal opacity-80">(Kembali ke Proyek)</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => handleNavigate(`/editor/${projectId}/steps/${stepNum + 1}`)}
+              className="flex items-center gap-1.5 rounded-xl bg-zinc-900 px-5 py-2 text-sm font-bold text-white transition-all hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white cursor-pointer shadow-xs"
+            >
+              <span>Next Step ({stepNum + 1})</span>
+              <span>&rarr;</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Image Browser Modal */}
@@ -493,6 +602,58 @@ export default function EditStepPage({
         projectId={projectId}
         onInsertImage={(markdownSyntax) => handleInsertInline(markdownSyntax, "", "")}
       />
+
+      {/* Unsaved Changes Confirmation Modal */}
+      {showUnsavedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="flex items-center gap-3.5 mb-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-2xl text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
+                ⚠️
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                  Perubahan Belum Disimpan
+                </h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Langkah {stepNum} memiliki editan yang belum tersimpan.
+                </p>
+              </div>
+            </div>
+
+            <p className="text-sm text-zinc-600 dark:text-zinc-300 mb-6 leading-relaxed">
+              Apakah Anda ingin menyimpan langkah ini terlebih dahulu sebelum berpindah halaman?
+            </p>
+
+            <div className="flex flex-col gap-2.5">
+              <button
+                type="button"
+                onClick={handleSaveAndNavigate}
+                disabled={saving}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-scratch-blue py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-600 disabled:opacity-50 transition-colors cursor-pointer"
+              >
+                <span>💾</span> {saving ? "Menyimpan..." : "Simpan & Lanjutkan"}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDiscardAndNavigate}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-950/60 transition-colors cursor-pointer"
+              >
+                <span>🗑️</span> Lanjutkan Tanpa Menyimpan
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCancelNavigate}
+                className="flex w-full items-center justify-center rounded-xl border border-zinc-200 py-2.5 text-sm font-medium text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+              >
+                Batal (Tetap di Sini)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -140,13 +140,16 @@ export async function updateStep(
   stepIndex: number,
   content: string
 ): Promise<{ success: true } | { success: false; error: string }> {
-  const uuid = await getProjectIdBySlug(projectId);
-  if (!uuid) return { success: false, error: `Project "${projectId}" not found` };
+  const project = await prisma.project.findUnique({
+    where: { slug: projectId },
+    select: { id: true, dirName: true },
+  });
+  if (!project) return { success: false, error: `Project "${projectId}" not found` };
 
   const existing = await prisma.step.findUnique({
     where: {
       projectId_stepNumber: {
-        projectId: uuid,
+        projectId: project.id,
         stepNumber: stepIndex,
       },
     },
@@ -161,6 +164,20 @@ export async function updateStep(
     where: { id: existing.id },
     data: { content },
   });
+
+  // Sync to MinIO in background for both id and en
+  try {
+    const { uploadFile } = await import("./minio");
+    const buffer = Buffer.from(content, "utf-8");
+    const keyId = `projects/${project.dirName}/id/step_${stepIndex}.md`;
+    const keyEn = `projects/${project.dirName}/en/step_${stepIndex}.md`;
+    await Promise.all([
+      uploadFile(keyId, buffer, "text/markdown"),
+      uploadFile(keyEn, buffer, "text/markdown"),
+    ]);
+  } catch (e) {
+    console.error("Failed to sync step to MinIO:", e);
+  }
 
   return { success: true };
 }

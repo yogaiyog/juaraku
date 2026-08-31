@@ -49,11 +49,11 @@ export type Project = {
 
 export type ContentSegment =
   | { type: "markdown"; content: string }
-  | { type: "task"; content: string }
+  | { type: "task"; content: string; segments?: ContentSegment[] }
   | { type: "print-only"; content: string }
   | { type: "no-print"; content: string }
   | { type: "blocks3"; code: string }
-  | { type: "collapse"; title: string; content: string }
+  | { type: "collapse"; title: string; content: string; segments?: ContentSegment[] }
   | { type: "save" };
 
 export type QuizChoice = {

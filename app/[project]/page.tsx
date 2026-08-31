@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { getProject, getAllProjects } from "@/lib/projects";
 import { getStepContent } from "@/lib/markdown";
 import { notFound } from "next/navigation";
@@ -19,17 +20,21 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { project } = await params;
-  const proj = await getProject(project);
+  const cookieStore = await cookies();
+  const locale = cookieStore.get("locale")?.value || "id";
+  const proj = await getProject(project, locale);
   if (!proj) return { title: "Not Found" };
   return { title: proj.meta.title };
 }
 
 export default async function ProjectPage({ params }: Props) {
   const { project } = await params;
-  const proj = await getProject(project);
+  const cookieStore = await cookies();
+  const locale = cookieStore.get("locale")?.value || "id";
+  const proj = await getProject(project, locale);
   if (!proj) notFound();
 
-  const firstStepContent = await getStepContent(project, 1);
+  const firstStepContent = await getStepContent(project, 1, locale);
 
   const introHtml = firstStepContent
     .filter((seg) => seg.type === "markdown")

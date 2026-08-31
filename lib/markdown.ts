@@ -85,13 +85,10 @@ export function parseStepMarkdown(raw: string): ContentSegment[] {
       if (blockStart.type === "collapse") {
         const { title, body } = extractCollapseContent(content);
         const subSegments = parseStepMarkdown(body);
-        for (const sub of subSegments) {
-          if (sub.type === "markdown") {
-            segments.push({ type: "collapse", title, content: sub.content });
-          } else {
-            segments.push(sub);
-          }
-        }
+        segments.push({ type: "collapse", title, content: body, segments: subSegments });
+      } else if (blockStart.type === "task") {
+        const subSegments = parseStepMarkdown(content);
+        segments.push({ type: "task", content, segments: subSegments });
       } else {
         const subSegments = parseStepMarkdown(content);
         for (const sub of subSegments) {
@@ -146,11 +143,25 @@ function findEarliestBlockStart(slice: string): {
 
 export async function getStepContent(
   projectId: string,
-  stepIndex: number
+  stepIndex: number,
+  locale: string = "id"
 ): Promise<ContentSegment[]> {
-  const { getStepPath } = await import("./projects");
-  const minioKey = await getStepPath(projectId, stepIndex);
-  const raw = await getFileText(minioKey);
+  const { getStepPath, getStepRawContent } = await import("./projects");
+
+  // 1. Try DB first (stores editor updates and localized synced DB content)
+  const dbContent = await getStepRawContent(projectId, stepIndex);
+  if (dbContent && dbContent.trim()) {
+    return parseStepMarkdown(dbContent);
+  }
+
+  // 2. Fallback to MinIO
+  const minioKey = await getStepPath(projectId, stepIndex, locale);
+  let raw = await getFileText(minioKey);
+  if (!raw) {
+    const fallback = locale === "id" ? "en" : "id";
+    const fallbackKey = await getStepPath(projectId, stepIndex, fallback);
+    raw = await getFileText(fallbackKey);
+  }
   if (!raw) return [];
   return parseStepMarkdown(raw);
 }

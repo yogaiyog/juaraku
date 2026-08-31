@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Blocks3LibModal from "./Blocks3LibModal";
 
 type BlockCategory = {
   name: string;
@@ -34,6 +35,7 @@ export default function EditorToolbar({
   onOpenImageBrowser,
 }: Props) {
   const [badgeMenuOpen, setBadgeMenuOpen] = useState(false);
+  const [blocksLibOpen, setBlocksLibOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close badge dropdown on outside click
@@ -134,13 +136,23 @@ export default function EditorToolbar({
 
         <button
           type="button"
+          onClick={() => setBlocksLibOpen(true)}
+          className="flex items-center gap-1.5 rounded-md bg-scratch-blue px-2.5 py-1 text-xs font-bold text-white shadow-xs hover:bg-blue-600 dark:bg-scratch-blue dark:hover:bg-blue-600 transition-colors"
+          title="Buka Pustaka Blok Scratch 3.0 (Kumpulan Blok Lengkap)"
+        >
+          <span>🧩</span>
+          <span>Blocks3 Lib</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() =>
             onInsertBlock("```blocks3\nwhen green flag clicked\nmove (10) steps\n```")
           }
           className="flex items-center gap-1 rounded bg-blue-100/70 px-2 py-1 text-xs font-semibold text-blue-800 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/60 transition-colors"
           title="Insert visual Scratch 3.0 blocks code"
         >
-          <span>🧩</span> Blocks3
+          <span>✏️</span> Quick Block
         </button>
 
         <button
@@ -237,6 +249,13 @@ export default function EditorToolbar({
           </div>
         )}
       </div>
+
+      {/* Blocks3 Library Modal */}
+      <Blocks3LibModal
+        isOpen={blocksLibOpen}
+        onClose={() => setBlocksLibOpen(false)}
+        onInsert={onInsertBlock}
+      />
     </div>
   );
 }
