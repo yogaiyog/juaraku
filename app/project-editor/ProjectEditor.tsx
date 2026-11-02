@@ -9,7 +9,50 @@ import remarkGfm from "remark-gfm";
 
 const DARK_KEY = "python-editor-dark";
 
+const splitList = (value?: string) =>
+  (value ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+
+/** Origin dashboard LMS yang boleh mengirim config ke editor & menerima progress. */
+const ALLOWED_LMS_ORIGINS = [
+  "https://app.juaraku.web.id",
+  "http://localhost:3000",
+  // Aplikasi Android (Capacitor)
+  "http://localhost",
+  "https://localhost",
+  "capacitor://localhost",
+  ...splitList(process.env.NEXT_PUBLIC_LMS_ORIGINS),
+];
+
+/** fallbackUrl hanya boleh mengarah ke API LMS ini. */
+const ALLOWED_API_ORIGINS = [
+  "https://api.juaraku.web.id",
+  "http://localhost:4000",
+  ...splitList(process.env.NEXT_PUBLIC_LMS_API_ORIGINS),
+];
+
+function isAllowedFallbackUrl(url: string) {
+  try {
+    return ALLOWED_API_ORIGINS.includes(new URL(url).origin);
+  } catch {
+    return false;
+  }
+}
+
+/** Kirim ke opener tanpa "*": ke origin yang diketahui, atau ke tiap origin yang diizinkan. */
+function postToOpener(message: unknown, knownOrigin: string | null) {
+  if (!window.opener || window.opener.closed) return;
+  const targets = knownOrigin ? [knownOrigin] : ALLOWED_LMS_ORIGINS;
+  for (const origin of targets) {
+    try {
+      window.opener.postMessage(message, origin);
+    } catch {
+      // origin tidak valid untuk postMessage — abaikan
+    }
+  }
+}
+
 type InitPayload = {
+  progressToken?: string;
   instructions?: string;
   defaultCode?: string;
   title?: string;
@@ -199,6 +242,9 @@ export default function ProjectEditor() {
   const studentIdRef = useRef<string | null>(null);
   const fallbackUrlRef = useRef<string | null>(null);
   const projectIdRef = useRef<string | null>(null);
+  const progressTokenRef = useRef<string | null>(null);
+  const openerOriginRef = useRef<string | null>(null);
+  const initializedRef = useRef(false);
 
   useEffect(() => {
     setDark(getInitialDark());
@@ -222,14 +268,21 @@ export default function ProjectEditor() {
   useEffect(() => {
     if (!ready) return;
 
-    if (window.opener) {
-      window.opener.postMessage({ type: "python-editor:ready" }, "*");
-    }
+    postToOpener({ type: "python-editor:ready" }, null);
 
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type !== "python-editor:init") return;
+      // Hanya terima config dari tab dashboard LMS yang membuka editor ini.
+      if (!ALLOWED_LMS_ORIGINS.includes(event.origin) || event.source !== window.opener) return;
       const payload = event.data.payload as InitPayload;
       if (!payload) return;
+
+      openerOriginRef.current = event.origin;
+      if (payload.progressToken) progressTokenRef.current = payload.progressToken;
+
+      // Init berikutnya (mis. kiriman ulang berisi progress token) tidak boleh menimpa kode siswa.
+      if (initializedRef.current) return;
+      initializedRef.current = true;
 
       if (initTimeoutRef.current) {
         clearTimeout(initTimeoutRef.current);
@@ -242,14 +295,10 @@ export default function ProjectEditor() {
       if (payload.title) setEditorTitle(payload.title);
       if (payload.taskCode) setTaskCode(payload.taskCode);
       if (payload.studentId) studentIdRef.current = payload.studentId;
-      if (payload.fallbackUrl) fallbackUrlRef.current = payload.fallbackUrl;
+      if (payload.fallbackUrl && isAllowedFallbackUrl(payload.fallbackUrl)) {
+        fallbackUrlRef.current = payload.fallbackUrl;
+      }
       if (payload.projectId) projectIdRef.current = payload.projectId;
-
-      console.log("[ProjectEditor] Init received", {
-        taskCode: payload.taskCode,
-        studentId: payload.studentId,
-        hasFallbackUrl: !!payload.fallbackUrl,
-      });
     };
 
     window.addEventListener("message", handleMessage);
@@ -270,27 +319,22 @@ export default function ProjectEditor() {
   const sendProgress = useCallback(
     (status: string) => {
       const payload = { taskCode, status, projectId: projectIdRef.current, studentId: studentIdRef.current };
-      if (window.opener && !window.opener.closed) {
-        window.opener.postMessage({ type: "python-editor:progress", payload }, "*");
-      }
+      postToOpener({ type: "python-editor:progress", payload }, openerOriginRef.current);
     },
     [taskCode],
   );
 
   const reportProgress = useCallback(async (taskId: string, status: string) => {
-    console.log("[ProjectEditor] reportProgress", { taskId, status, studentId: studentIdRef.current, hasOpener: !!window.opener, hasFallbackUrl: !!fallbackUrlRef.current });
-
     const payload = { taskCode: taskId, status, projectId: projectIdRef.current, studentId: studentIdRef.current };
 
     if (window.opener && !window.opener.closed) {
-      console.log("[ProjectEditor] Sending postMessage to opener");
-      window.opener.postMessage({ type: "python-editor:done", payload }, "*");
+      postToOpener({ type: "python-editor:done", payload }, openerOriginRef.current);
       return;
     }
 
     if (fallbackUrlRef.current) {
-      console.log("[ProjectEditor] Sending HTTP fallback to", fallbackUrlRef.current);
       const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (progressTokenRef.current) headers["X-Progress-Token"] = progressTokenRef.current;
       try {
         const res = await fetch(fallbackUrlRef.current, {
           method: "POST",

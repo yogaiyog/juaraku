@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireEditor } from "@/lib/auth";
 import { parseStepMarkdown } from "@/lib/markdown";
 import { renderMarkdown } from "@/lib/render-markdown";
 import type { ContentSegment } from "@/lib/types";
@@ -54,6 +55,8 @@ function transformToPreviewSegments(segments: ContentSegment[]): PreviewSegment[
 }
 
 export async function POST(req: Request) {
+  const unauthorized = await requireEditor();
+  if (unauthorized) return unauthorized;
   try {
     const body = await req.json();
     const { markdown, projectId } = body;

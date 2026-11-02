@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireEditor } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { uploadFile, getMimeType } from "@/lib/minio";
 
@@ -6,6 +7,8 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
+  const unauthorized = await requireEditor();
+  if (unauthorized) return unauthorized;
   try {
     const { projectId } = await params;
 

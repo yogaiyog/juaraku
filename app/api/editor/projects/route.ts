@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
+import { requireEditor } from "@/lib/auth";
 import { createProject } from "@/lib/projects-db-write";
 import { getAllProjects } from "@/lib/projects";
 
 export async function GET() {
+  const unauthorized = await requireEditor();
+  if (unauthorized) return unauthorized;
   try {
     const projects = await getAllProjects();
     return NextResponse.json(projects);
@@ -16,6 +19,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const unauthorized = await requireEditor();
+  if (unauthorized) return unauthorized;
   try {
     const body = await req.json();
     const { projectId, meta } = body;

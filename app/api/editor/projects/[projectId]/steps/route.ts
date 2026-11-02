@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireEditor } from "@/lib/auth";
 import { addStep } from "@/lib/projects-db-write";
 import { getProjectMeta } from "@/lib/projects";
 
@@ -6,6 +7,8 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
+  const unauthorized = await requireEditor();
+  if (unauthorized) return unauthorized;
   const { projectId } = await params;
 
   try {
@@ -25,6 +28,8 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
+  const unauthorized = await requireEditor();
+  if (unauthorized) return unauthorized;
   const { projectId } = await params;
 
   try {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireEditor } from "@/lib/auth";
 import { updateStep, removeStep } from "@/lib/projects-db-write";
 import { getStepRawContent } from "@/lib/projects";
 
@@ -6,6 +7,8 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ projectId: string; stepIndex: string }> }
 ) {
+  const unauthorized = await requireEditor();
+  if (unauthorized) return unauthorized;
   const { projectId, stepIndex } = await params;
   const idx = Number.parseInt(stepIndex, 10);
 
@@ -21,6 +24,8 @@ export async function PUT(
   req: Request,
   { params }: { params: Promise<{ projectId: string; stepIndex: string }> }
 ) {
+  const unauthorized = await requireEditor();
+  if (unauthorized) return unauthorized;
   const { projectId, stepIndex } = await params;
   const idx = Number.parseInt(stepIndex, 10);
 
@@ -47,6 +52,8 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ projectId: string; stepIndex: string }> }
 ) {
+  const unauthorized = await requireEditor();
+  if (unauthorized) return unauthorized;
   const { projectId, stepIndex } = await params;
   const idx = Number.parseInt(stepIndex, 10);
 

@@ -1,4 +1,5 @@
-import { type NextAuthOptions } from "next-auth";
+import { getServerSession, type NextAuthOptions } from "next-auth";
+import { NextResponse } from "next/server";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcrypt";
 import { prisma } from "./prisma";
@@ -58,3 +59,16 @@ export const authOptions: NextAuthOptions = {
     },
   },
 };
+
+/**
+ * Guard untuk route API CMS editor (/api/editor/**).
+ * `proxy.ts` tidak mencakup /api, jadi setiap handler wajib memanggil ini.
+ * Return NextResponse 401 bila belum login, atau null bila boleh lanjut.
+ */
+export async function requireEditor() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  return null;
+}
